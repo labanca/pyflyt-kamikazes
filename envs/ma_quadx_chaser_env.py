@@ -1,4 +1,4 @@
-"""Multiagent QuadX Hover Environment."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -59,7 +59,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         flight_dome_size: float = 10.0,
         max_duration_seconds: float = 30.0,
         angle_representation: str = "quaternion",
-        agent_hz: int = 40,
+        agent_hz: int = 15,
         render_mode: None | str = None,
         uav_mapping: np.array = np.array(['lm', 'lm', 'lm', 'lm']),
         seed : int = None,
@@ -92,7 +92,8 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         )
 
-        self.lethal_distance = 0.5
+        self.lethal_distance = 0.15
+        self.lethal_angle = 0.1
         self.sparse_reward = sparse_reward
         self.spawn_setting = spawn_settings
 
@@ -157,12 +158,18 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         # compute engagement angles
         self.previous_angles = self.current_angles.copy()
-        self.current_angles = np.arccos(
-            np.sum(separation * forward_vecs, axis=-1) / (self.current_distance+ 1e-10)
-        )
-        #np.nan_to_num(self.current_angles, copy=False)
 
-        self.chasing = np.abs(self.current_angles) < (np.pi / 4.0) # I've tryed  /3.0 45º
+        x1 = np.sum(separation * forward_vecs, axis=-1)
+        x2 = self.current_distance
+        self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
+
+
+        # self.current_angles = np.arccos(
+        #     np.sum(separation * forward_vecs, axis=-1) / (self.current_distance+ 1e-10)
+        # )
+
+        self.in_cone = self.current_angles < self.lethal_angle
+        self.chasing = np.abs(self.current_angles) < (np.pi / 2.0) # I've tryed  /3.0 45º
         self.in_range = self.current_distance < self.lethal_distance
 
 
@@ -254,27 +261,35 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             # reward for closing the distance
             rew_closing_distance = (np.clip(
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                a_min=0.0,
+                a_min=-10.0,
                 a_max=None,
                 ) * (~self.in_range[agent_id][target_id] & self.chasing[agent_id][target_id]) * 1.0)
 
+            # TODO: tentar quando angulo for praticaemnte 0 dar 0 pra ele buscar as demais rewards.
+            # reward for engaging the enemy
+            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id]+ 0.0001) * self.in_cone[agent_id][target_id]
+
             # reward for progressing to engagement
-            rew_progress_eng =(
-                (self.previous_angles[agent_id][target_id] - self.current_angles[agent_id][target_id]) * self.in_range[agent_id][target_id] * 10.0
+            rew_progress_eng = (
+                    (self.previous_angles[agent_id][target_id] - self.current_angles[agent_id][target_id]) * 10.0 *
+                    self.in_range[agent_id][target_id]
             )
 
-            # reward for engaging the enemy
-            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id] + 0.1) * self.in_range[agent_id][target_id]
+            # reward for go to collission
+            rew_last_distance = (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][
+                target_id]) * 3 * self.in_range[agent_id][target_id]
 
             ## reward for maintaning high speed.
             #self.rewards[agent_id] += 1.0 * self.current_magnitude[agent_id] * self.chasing[agent_id][target_id]
             #print(f'rew maintaning high speed {1.0 * self.current_magnitude[agent_id] * self.chasing[agent_id][target_id]}')
 
-            self.rewards[agent_id] += rew_closing_distance + rew_progress_eng + rew_engaging_enemy
+            self.rewards[agent_id] += rew_closing_distance + rew_progress_eng + rew_engaging_enemy + rew_last_distance
 
-            # if (rew_engaging_enemy > 0) or (rew_progress_eng > 0) or (rew_closing_distance > 0):
+            # if rew_closing_distance > 0:
             #     print(f'rew closing distance {rew_closing_distance}')
+            # if rew_progress_eng > 0:
             #     print(f'rew progressing to engagement {rew_progress_eng}')
+            # if rew_engaging_enemy > 0:
             #     print(f'rew engaging the enemy {rew_engaging_enemy}')
             #     print(f'------------------------------------------------------------')
 

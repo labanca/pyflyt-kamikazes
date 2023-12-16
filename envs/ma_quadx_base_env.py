@@ -1,4 +1,5 @@
 """Base Multiagent QuadX Environment."""
+from __future__ import  annotations
 from copy import deepcopy
 from typing import Any
 
@@ -69,7 +70,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         # action space flight_mode 6: vx, vy, vr, vz
         angular_rate_limit = np.pi
-        thrust_limit = 2.0
+        thrust_limit = 4.0
         high = np.array(
             [
                 thrust_limit,

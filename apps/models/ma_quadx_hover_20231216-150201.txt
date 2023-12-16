@@ -1,19 +1,19 @@
 random_respawn=True
 __file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
-model.num_timesteps=60014592
+model.num_timesteps=1007616
 device=device(type='cpu')
 seed=None
-model.start_datetime=2023-12-14 23:56:43.354323
-completion_datetime=2023-12-15 12:16:24.138376
-elapsed_time=12:19:40.784053
+model.start_datetime=2023-12-16 14:24:56.148324
+completion_datetime=2023-12-16 15:02:02.031357
+elapsed_time=0:37:05.883033
 num_cpus=12
 num_vec_envs=12
 model.device=device(type='cpu')
 model.learning_rate=0.0001
-env_kwargs={'start_pos': array([[ 4.51010188, -2.41716434,  4.89347482],
-       [ 4.79262691,  3.06213084,  2.16312827]]), 'start_orn': array([[ 0.33696376,  0.81813497, -6.27592443],
-       [ 0.4169254 ,  0.08873676,  2.95430432]]), 'flight_dome_size': 15.588457268119896, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}, 'num_lm': 1}
-spawn_settings={'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}
+env_kwargs={'num_lm': 1, 'start_pos': array([[ 4.40283433, -3.04181985,  2.60671554],
+       [-0.0847122 ,  0.78471218,  1.51695072]]), 'start_orn': array([[ 0.67620166, -0.62613092,  3.28212609],
+       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 18.186533479473212, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': None}
+spawn_settings={'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 6.0, 'center': (0, 0, 0), 'seed': None}
 model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
 model.policy=ActorCriticPolicy(
   (features_extractor): FlattenExtractor(

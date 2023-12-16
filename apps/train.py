@@ -10,16 +10,17 @@ import glob
 import os
 import time
 import numpy as np
+import torch
 from datetime import datetime
 
 import supersuit as ss
+import torch
 from stable_baselines3 import PPO
 from stable_baselines3.ppo import MlpPolicy
 from stable_baselines3.common.utils import get_device
 from gymnasium.utils import EzPickle
 from pettingzoo.utils import parallel_to_aec
 
-#from PyFlyt.pz_envs import MAQuadXHoverEnv
 from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
 
 
@@ -40,9 +41,10 @@ def train_butterfly_supersuit(
     num_cpus =  12 #(os.cpu_count() or 1)
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
-    device = get_device('cuda')
-    batch_size = 512 # 512 davi
-    lr = 10e-5
+
+    device = get_device('cpu')
+    batch_size = 256 # 512 davi
+    lr = 10e-4
     nn_t = [128, 128, 128]
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
@@ -68,28 +70,32 @@ def train_butterfly_supersuit(
 
     with open(f'{model_name}.txt', 'w') as file:
         # Write train params to file
-        file.write(f'random_respawn={True if spawn_settings != None else False}\n')
-        file.write(f'{__file__=}\n')
-        file.write(f'{model.num_timesteps=}\n')
-        file.write(f'{device=}\n')
-        file.write(f'{seed=}\n')
         start_datetime = datetime.fromtimestamp(model.start_time / 1e9)
         current_time = datetime.now()
         elapsed_time = current_time - start_datetime
+        file.write(f'{__file__=}\n')
         file.write(f'model.start_datetime={start_datetime}\n')
-        file.write(f'completion_datetime={current_time}\n')
         file.write(f'elapsed_time={elapsed_time}\n')
+        file.write(f'{model.num_timesteps=:n}\n')
+        file.write(f'{device=}\n')
+        file.write(f'{seed=}\n')
+        file.write(f'{batch_size=}\n')
+        file.write(f'{model.learning_rate=}\n')
+        file.write(f'{nn_t=}\n')
         file.write(f'{num_cpus=}\n')
         file.write(f'{num_vec_envs=}\n')
-        file.write(f'{model.device=}\n')
-        file.write(f'{model.learning_rate=}\n')
-        file.write(f'{env_kwargs=}\n')
+        file.write(f'{model.n_envs=}\n')
+        file.write(f'random_respawn={True if spawn_settings != None else False}\n')
         file.write(f'{spawn_settings=}\n')
+        file.write(f'completion_datetime={current_time}\n')
+        file.write(f'{env_kwargs=}\n')
         file.write(f'{model.policy_kwargs=}\n')
         file.write(f'{model.policy=}\n')
         file.write(f'{model.policy_aliases=}\n')
         file.write(f'{model.policy_class=}\n')
-        file.write(f'{model.n_envs=}\n')
+
+
+
     env.close()
 
 
@@ -140,7 +146,7 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
                 print(f'{reward=}\n')
                 print(f'{info}')
             env.step(act)
-            print(f'{reward=}')
+            #print(f'{reward=}')
 
 
 
@@ -185,8 +191,8 @@ seed=None
 #find a better way to store it
 spawn_settings = dict(
     num_drones=2,
-    min_distance=3.0,
-    spawn_radius=5.0,
+    min_distance=2.0,
+    spawn_radius=6.0,
     center=(0, 0, 0),
     seed=seed,
 )
@@ -196,7 +202,7 @@ if __name__ == "__main__":
 
     env_kwargs = {}
     env_kwargs['num_lm'] = 1
-    env_kwargs['start_pos'] , env_kwargs['start_orn'] = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[0, 0, 1], [0,0,1]])
+    env_kwargs['start_pos'] , env_kwargs['start_orn'] = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[0, 0.1, 1], [0, 0, 1]])
     #env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
     env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
     env_kwargs['uav_mapping'] = np.array(['lm', 'lw'])
@@ -205,8 +211,8 @@ if __name__ == "__main__":
 
     #seed = 42
 
-    # Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=1_000_000, **env_kwargs)
+    #Train a model (takes ~3 minutes on GPU)
+    train_butterfly_supersuit(env_fn, steps=10_000_000, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

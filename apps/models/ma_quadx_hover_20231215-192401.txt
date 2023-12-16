@@ -1,17 +1,17 @@
 random_respawn=True
 __file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
-model.num_timesteps=1007616
+model.num_timesteps=3022848
 device=device(type='cpu')
 seed=None
-model.start_datetime=2023-12-15 15:08:23.342485
-completion_datetime=2023-12-15 15:21:11.406953
-elapsed_time=0:12:48.064468
+model.start_datetime=2023-12-15 18:11:44.706832
+completion_datetime=2023-12-15 19:24:01.741350
+elapsed_time=1:12:17.034518
 num_cpus=12
 num_vec_envs=12
 model.device=device(type='cpu')
 model.learning_rate=0.0001
-env_kwargs={'num_lm': 1, 'start_pos': array([[ 3.27765137, -2.63062968,  2.88327911],
-       [ 0.03228443,  0.28579187,  1.08373253]]), 'start_orn': array([[ 0.23339136, -0.29418115, -4.36503884],
+env_kwargs={'num_lm': 1, 'start_pos': array([[-0.42102701, -0.94047345,  1.5466124 ],
+       [ 3.93842107,  1.17799953,  2.52099203]]), 'start_orn': array([[-0.25037183, -0.90367229,  2.83778305],
        [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 15.588457268119896, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}}
 spawn_settings={'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}
 model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
