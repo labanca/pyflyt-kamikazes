@@ -26,7 +26,7 @@ def get_start_pos_orn(num_drones, min_distance, spawn_radius, center, num_lm, se
 
     return start_pos, start_orn
 
-model = PPO.load('models/ma_quadx_hover_20231215-145039.zip')
+model = PPO.load('models/ma_quadx_hover_20231219-080504.zip')
 seed=None
 
 print((os.cpu_count() or 1))
@@ -39,15 +39,14 @@ spawn_settings = dict(
 )
 
 env_kwargs = {}
-env_kwargs['num_lm'] = 1
+env_kwargs['num_lm'] = 2
 env_kwargs['start_pos'], env_kwargs['start_orn'] = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) # np.array([[0, 0, 1], [4,0,1]])
 #env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
-#env_kwargs['uav_mapping'] = np.array(['lm', 'lm', 'lm', 'lm', 'lm','lm', 'lw', 'lw', 'lw', 'lw'])
 env_kwargs['seed'] = seed
+env_kwargs['spawn_settings'] = spawn_settings
 
-
-env = MAQuadXHoverEnv(render_mode="human", spawn_settings=spawn_settings, **env_kwargs)
+env = MAQuadXHoverEnv(render_mode="human", **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}

@@ -1,19 +1,21 @@
-random_respawn=True
 __file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
-model.num_timesteps=1007616
+model.start_datetime=2023-12-17 01:31:08.258240
+elapsed_time=8:11:03.304419
+model.num_timesteps=20004864
 device=device(type='cpu')
 seed=None
-model.start_datetime=2023-12-15 14:38:15.902108
-completion_datetime=2023-12-15 14:50:39.728595
-elapsed_time=0:12:23.826487
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[128, 128, 128]
 num_cpus=12
 num_vec_envs=12
-model.device=device(type='cpu')
-model.learning_rate=0.0001
-env_kwargs={'num_lm': 1, 'start_pos': array([[ 3.17855369,  3.5741867 ,  3.23235001],
-       [ 1.8356626 , -4.01980039,  2.70274212]]), 'start_orn': array([[-0.54342057,  0.41508125, -4.28503627],
-       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 15.588457268119896, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}}
-spawn_settings={'num_drones': 2, 'min_distance': 3.0, 'spawn_radius': 5.0, 'center': (0, 0, 0), 'seed': None}
+model.n_envs=12
+random_respawn=True
+spawn_settings={'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 7.0, 'center': (0, 0, 0), 'seed': None}
+completion_datetime=2023-12-17 09:42:11.562659
+env_kwargs={'num_lm': 1, 'start_pos': array([[-2.33072777, -4.89491653,  4.1908199 ],
+       [-5.41339902,  3.16193107,  1.2323029 ]]), 'start_orn': array([[-0.77042065,  0.0079042 ,  5.08758827],
+       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 20.784609690826528, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 7.0, 'center': (0, 0, 0), 'seed': None}}
 model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
 model.policy=ActorCriticPolicy(
   (features_extractor): FlattenExtractor(
@@ -48,4 +50,3 @@ model.policy=ActorCriticPolicy(
 )
 model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
 model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>
-model.n_envs=12
