@@ -31,7 +31,7 @@ seed=None
 
 print((os.cpu_count() or 1))
 spawn_settings = dict(
-    num_drones=4,
+    num_drones=3,
     min_distance=3.0,
     spawn_radius=5.0,
     center=(0, 0, 0),
@@ -46,11 +46,14 @@ env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) **
 env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = spawn_settings
 
-env = MAQuadXHoverEnv(render_mode="human", **env_kwargs)
+env = MAQuadXHoverEnv(render_mode=None, **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}
+counters = {'success': 0, 'out_of_bounds': 0, 'crashes': 0, 'timeover': 0}
 first_time = True
+num_games = 100
+
 last_start_pos = env_kwargs['start_pos']
 while env.agents:
     # this is where you would insert your policy
@@ -58,45 +61,40 @@ while env.agents:
 
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
-    #print(f'{actions=}')
-
-    # if len(env.agents) >= 2 :
-    #     actions['uav_0'][0] = 0.8
-    #     actions['uav_0'][1] = 0
-    #     actions['uav_0'][2] = 0
-    #     actions['uav_0'][3] = 0.01
-
-
     observations, rewards, terminations, truncations, infos = env.step(actions)
-
-    #print(f'{terminations=}')
-    #print(f'{truncations=}\n')
-    #print(f'{rewards=}{terminations=}{truncations=}\n')
-    #print(infos)
-    #print(observations)
 
     if first_time == True:
         first_time = False
 
-    elif set(terminations.values()) != set(last_term.values() ):
-        print(f"| An agent terminated |")
-        print(f'{terminations=}')
-        print(f'{truncations=}')
-        print(f'{infos=}\n')
+    # elif set(terminations.values()) != set(last_term.values()) and (len(terminations.values()) == len(last_term.values())):
+    #     print(f"| An agent terminated |")
+    #     print(f'{terminations=}')
+    #     print(f'{truncations=}')
+    #     print(f'{infos=}\n')
+    #
+    # last_term = terminations
 
-    last_term = terminations
+    # if all(terminations.values()) or all(truncations.values()):
+    #     print(f'********* EPISODE END **********\n')
+    #     print(f'{rewards=}\n')
+    #     print(f'{terminations=} {truncations=}\n')
+    #     print(f'{infos=}\n\n\n')
+    #     time.sleep(3)
 
-    if all(terminations.values()) or all(truncations.values()):
-        print(f'********* EPISODE END **********\n')
-        print(f'{rewards=}\n')
-        print(f'{terminations=} {truncations=}\n')
-        print(f'{infos=}\n\n\n')
-        time.sleep(3)
+    if any(terminations.values()) or any(truncations.values()):
 
-        last_start_pos = env.start_pos
+        for agent_key, agent_data in infos.items():
+            for key, value in agent_data.items():
+                if key in counters:
+                    counters[key] += 1
+
+
         observations, infos = env.reset(seed=seed)
-        new_start_pos = env.start_pos
-        print(f'{last_start_pos=}\n {new_start_pos=}')
+
+        num_games -= 1
+        if num_games == 0:
+            print(counters)
+            break
 
 env.close()
 

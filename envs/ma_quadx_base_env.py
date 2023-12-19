@@ -187,7 +187,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             zip(list(range(len(self.drone_list))), self.drone_list)
         )
 
-
         self.drone_classes = dict(
             zip(range(self.num_drones), self.uav_mapping))
 
@@ -257,7 +256,12 @@ class MAQuadXBaseEnv(ParallelEnv):
         #update lists to reset death agents
         self.agents = self.possible_agents[:]
         self.targets = self.possible_targets
-        self.update_control_lists()
+
+        self.drone_list = self.agents + self.targets
+        self.num_drones = len(self.drone_list)
+        self.uav_mapping = np.array(['lm'] * self.num_lm + ['lw'] * (len(self.start_pos) - self.num_lm))
+        self.drone_id_mapping = dict(enumerate(self.drone_list))
+        self.drone_classes = dict(enumerate(self.uav_mapping))
 
         self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
         self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
@@ -400,7 +404,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         # collision with ground
         if np.any(self.aviary.contact_array[self.aviary.drones[agent_id].Id][0]):
             reward -= 100.0
-            info["collision"] = True
+            info["crashes"] = True
             term |= True
 
         # exceed flight dome
@@ -408,12 +412,15 @@ class MAQuadXBaseEnv(ParallelEnv):
             reward -= 100.0
             info["out_of_bounds"] = True
             term |= True
+            trunc |= True
 
         # collide with any loyal wingmen
-        if 'lw' in self.uav_mapping[np.where(self.aviary.contact_array[self.aviary.drones[agent_id].Id][1:])]:
+        colissions = self.get_type_collision(agent_id)
+        if 'lw' in colissions:
             reward += 10000.0
-            info["sucess"] = True
+            info["success"] = True
             term |= True
+            trunc |= True
 
 
         return term, trunc, reward, info
@@ -474,6 +481,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         for _ in range(self.env_step_ratio):
             self.aviary.step()
 
+            # Avoid losing detect a collision with aviary steps without a RL step.
+            # Only breaks for the agents in self.agents (terminated agents do not stop the aviary steps)
+            if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
+                break
+
         # update reward, term, trunc, for each agent
         for ag in self.agents:
             ag_id = self.agent_name_mapping[ag]
@@ -493,8 +505,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             # TODO: To solve: File "C:\projects\pyflyt_parallel\venv\lib\site-packages\pettingzoo\utils\conversions.py", line 357, in step assert action is None
             # I believe this can be solved inside compute_term_trunc_reward_info_by_id with trunc |= true
 
-            if terminations[ag]:
-                 truncations[ag] = True
+            if terminations[ag] or truncations[ag]:
+                 self.disarm_drone(self.agent_name_mapping[ag])
 
 
         # increment step count and cull dead agents for the next round
@@ -586,15 +598,19 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.uav_mapping = np.array(['lm'] * len(self.agents) + ['lw'] * len(self.targets))
 
-        self.drone_id_mapping = dict(
-            zip(list(range(len(self.drone_list))), self.drone_list)
-        )
+        # remove the item withou modifing the ids
+        # self.drone_id_mapping = dict(
+        #     zip(list(range(len(self.drone_list))), self.drone_list)
+        # )
+
+        self.drone_id_mapping = {key: value for key, value in self.drone_id_mapping.items() if value in self.drone_list}
 
         self.num_drones = len(self.agents) + len(self.targets)
 
-        self.drone_classes = dict(
-            zip(range(self.num_drones), self.uav_mapping))
+        # self.drone_classes = dict(
+        #     zip(range(self.num_drones), self.uav_mapping))
 
+        self.drone_classes = dict(zip(self.drone_id_mapping.keys(), self.uav_mapping ))
 
     def draw_forward_vector(self, drone_index, line_id = None, length=1.0, lineColorRGB=[1, 0, 0] ):
         # Calculate the forward vector based on the drone's orientation
@@ -700,7 +716,8 @@ class MAQuadXBaseEnv(ParallelEnv):
 
 
         # Find indices where uav_mapping is 'lw'
-        lw_indices = np.where(self.uav_mapping == 'lw')[0]
+        #lw_indices = np.where(self.uav_mapping == 'lw')[0]
+        lw_indices = np.array([key for key, value in self.drone_classes.items() if value == 'lw'])
 
         # Filter distances based on 'lw' indices
         lw_distances = distances[lw_indices]
@@ -708,4 +725,20 @@ class MAQuadXBaseEnv(ParallelEnv):
         # Find the index of the minimum distance in lw_distances
         nearest_drone_index = lw_indices[np.argmin(lw_distances)]
 
+
         return nearest_drone_index
+
+    def disarm_drone(self, agent_id):
+
+        armed_drones_ids = {drone.Id for drone in self.aviary.armed_drones}
+        armed_status_list = [drone.Id in armed_drones_ids for drone in self.aviary.drones]
+        armed_status_list[agent_id] = False
+
+        self.aviary.set_armed(armed_status_list)
+
+    def get_type_collision(self, agent_id):
+
+        collisions = np.where(self.aviary.contact_array[self.aviary.drones[agent_id].Id][1:])[0]
+        collision_types = [value for key, value in self.drone_classes.items() if key in collisions]
+        return collision_types
+

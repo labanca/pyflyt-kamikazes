@@ -194,7 +194,7 @@ seed=None
 
 #find a better way to store it
 spawn_settings = dict(
-    num_drones=4,
+    num_drones=3,
     min_distance=2.0,
     spawn_radius=3.0,
     center=(0, 0, 0),
