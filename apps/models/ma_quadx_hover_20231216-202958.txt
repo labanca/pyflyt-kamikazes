@@ -1,0 +1,52 @@
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-16 16:13:04.952115
+elapsed_time=4:16:53.383714
+model.num_timesteps=10002432
+device=device(type='cpu')
+seed=None
+batch_size=256
+model.learning_rate=0.001
+nn_t=[128, 128, 128]
+num_cpus=12
+num_vec_envs=12
+model.n_envs=12
+random_respawn=True
+spawn_settings={'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 6.0, 'center': (0, 0, 0), 'seed': None}
+completion_datetime=2023-12-16 20:29:58.335829
+env_kwargs={'num_lm': 1, 'start_pos': array([[-4.49950089,  5.81119252,  5.10162141],
+       [ 1.19591659, -0.81883167,  3.38264213]]), 'start_orn': array([[ 0.14315879, -0.71920156,  2.82528221],
+       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 18.186533479473212, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 6.0, 'center': (0, 0, 0), 'seed': None}}
+model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=128, out_features=4, bias=True)
+  (value_net): Linear(in_features=128, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

@@ -1,0 +1,53 @@
+train_desc=' # reward for closing the distance\n            rew_closing_distance = np.clip(\n                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],\n                a_min=-10.0,\n                a_max=None,\n                ) * (\n                    \n                    self.chasing[agent_id][target_id] * 1.0\n                    \n                    )\n\n            # reward for engaging the enemy\n            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id]+ 0.1) * (\n                self.in_cone[agent_id][target_id] \n                * self.approaching[agent_id][target_id]\n                * 1.0\n            )\n\n            # reward for progressing to engagement\n            rew_progress_eng = (\n                    (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id]) * 10.0\n                    * self.in_range[agent_id][target_id]\n                    * self.approaching[agent_id][target_id] * 1.0\n            )\n'
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-18 20:18:54.169353
+elapsed_time=0:38:11.492151
+model.num_timesteps=1015808
+device=device(type='cpu')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[128, 128, 128]
+num_cpus=8
+num_vec_envs=8
+model.n_envs=8
+random_respawn=True
+spawn_settings={'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 3.0, 'center': (0, 0, 0), 'seed': None}
+completion_datetime=2023-12-18 20:57:05.661504
+env_kwargs={'num_lm': 1, 'start_pos': array([[ 2.14333438,  1.82764326,  2.24295397],
+       [-2.02677485, -1.2941934 ,  2.76571305]]), 'start_orn': array([[-0.48710202,  0.54307622,  0.12950836],
+       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 10.392304845413264, 'uav_mapping': array(['lm', 'lw'], dtype='<U2'), 'spawn_settings': {'num_drones': 2, 'min_distance': 2.0, 'spawn_radius': 3.0, 'center': (0, 0, 0), 'seed': None}}
+model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=128, out_features=4, bias=True)
+  (value_net): Linear(in_features=128, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>
