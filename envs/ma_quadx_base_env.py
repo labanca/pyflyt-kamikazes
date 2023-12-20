@@ -255,7 +255,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         #update lists to reset death agents
         self.agents = self.possible_agents[:]
-        self.targets = self.possible_targets
+        self.targets = self.possible_targets[:]
 
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
@@ -457,6 +457,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         """
 
         # copy over the past values
+
         self.past_actions = deepcopy(self.current_actions)
 
         # set the new actions and send to aviary
@@ -506,7 +507,13 @@ class MAQuadXBaseEnv(ParallelEnv):
             # I believe this can be solved inside compute_term_trunc_reward_info_by_id with trunc |= true
 
             if terminations[ag] or truncations[ag]:
-                 self.disarm_drone(self.agent_name_mapping[ag])
+                self.disarm_drone(ag_id)
+
+                collisions_ids = self.get_collision_ids(ag_id)
+                for id in collisions_ids:
+                    if self.drone_classes[id] == 'lw':
+                        self.disarm_drone(id)
+                        self.targets.remove(self.drone_id_mapping[id]) # remove the target
 
 
         # increment step count and cull dead agents for the next round
@@ -519,7 +526,11 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.update_control_lists()
 
-
+        # all targets destroyed, End.
+        if self.targets == []:
+            terminations = {k: True for k in self.agents}
+            truncations = {k: True for k in self.agents}
+            infos = {key: {'mission_complete': True, **infos[key]} for key in infos}
 
 
         # Trunc if all lm are terminated (dead)
@@ -590,25 +601,13 @@ class MAQuadXBaseEnv(ParallelEnv):
 
     def update_control_lists(self):
 
-        # self.agent_name_mapping = dict(
-        #     zip(self.agents, list(range(len(self.agents))))
-        # )
-
         self.drone_list = self.agents + self.targets
 
         self.uav_mapping = np.array(['lm'] * len(self.agents) + ['lw'] * len(self.targets))
 
-        # remove the item withou modifing the ids
-        # self.drone_id_mapping = dict(
-        #     zip(list(range(len(self.drone_list))), self.drone_list)
-        # )
-
         self.drone_id_mapping = {key: value for key, value in self.drone_id_mapping.items() if value in self.drone_list}
 
         self.num_drones = len(self.agents) + len(self.targets)
-
-        # self.drone_classes = dict(
-        #     zip(range(self.num_drones), self.uav_mapping))
 
         self.drone_classes = dict(zip(self.drone_id_mapping.keys(), self.uav_mapping ))
 
@@ -742,3 +741,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         collision_types = [value for key, value in self.drone_classes.items() if key in collisions]
         return collision_types
 
+    def get_collision_ids(self, agent_id):
+
+        collisions = np.where(self.aviary.contact_array[self.aviary.drones[agent_id].Id][1:])[0]
+        return collisions

@@ -175,12 +175,12 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         lin_vel = self.attitudes[: ,2]
         normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
         x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
-        self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  #
+        self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
 
 
-        self.in_cone = self.current_vel_angles < self.lethal_angle
-        self.in_range = self.current_distance < self.lethal_distance
-        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 3.0)  # I've tryed  /3.0 45º
+        self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
+        self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
+        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 3.0)  # I've tryed  2.0
 
 
 
@@ -444,3 +444,5 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
+
+

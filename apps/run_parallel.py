@@ -31,15 +31,15 @@ seed=None
 
 print((os.cpu_count() or 1))
 spawn_settings = dict(
-    num_drones=3,
-    min_distance=3.0,
+    num_drones=8,
+    min_distance=2.0,
     spawn_radius=5.0,
     center=(0, 0, 0),
     seed=seed,
 )
 
 env_kwargs = {}
-env_kwargs['num_lm'] = 2
+env_kwargs['num_lm'] = 7
 env_kwargs['start_pos'], env_kwargs['start_orn'] = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) # np.array([[0, 0, 1], [4,0,1]])
 #env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
@@ -74,12 +74,7 @@ while env.agents:
     #
     # last_term = terminations
 
-    # if all(terminations.values()) or all(truncations.values()):
-    #     print(f'********* EPISODE END **********\n')
-    #     print(f'{rewards=}\n')
-    #     print(f'{terminations=} {truncations=}\n')
-    #     print(f'{infos=}\n\n\n')
-    #     time.sleep(3)
+
 
     if any(terminations.values()) or any(truncations.values()):
 
@@ -88,13 +83,20 @@ while env.agents:
                 if key in counters:
                     counters[key] += 1
 
-
+    if all(terminations.values()) or all(truncations.values()):
+        print(f'********* EPISODE END **********\n')
+        print(f'{rewards=}\n')
+        print(f'{terminations=} {truncations=}\n')
+        print(f'{infos=}\n\n\n')
+        time.sleep(3)
         observations, infos = env.reset(seed=seed)
-
         num_games -= 1
-        if num_games == 0:
-            print(counters)
-            break
+        print(f'Remaining games: {num_games}')
+
+
+    if num_games == 0:
+        print(counters)
+        break
 
 env.close()
 

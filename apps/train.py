@@ -156,7 +156,7 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
 
     avg_reward_per_agent = sum(rewards.values()) / len(rewards.values()  )
     avg_reward_per_game = sum(rewards.values()) / num_games
-    print("Rewards: ", rewards)
+    print("\nRewards: ", rewards)
     print(f"Avg reward per agent: {avg_reward_per_agent}")
     print(f"Avg reward per game: {avg_reward_per_game}")
     return avg_reward_per_game
@@ -194,9 +194,9 @@ seed=None
 
 #find a better way to store it
 spawn_settings = dict(
-    num_drones=3,
+    num_drones=8,
     min_distance=2.0,
-    spawn_radius=3.0,
+    spawn_radius=5.0,
     center=(0, 0, 0),
     seed=seed,
 )
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['num_lm'] = 2
+    env_kwargs['num_lm'] = 4
     env_kwargs['start_pos'], env_kwargs['start_orn']  = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[1, 1, 1], [-1, -1, 2]])
     #env_kwargs['start_orn'] =  #np.zeros_like(env_kwargs['start_pos']) np.array([[-1, -1, 2], [0, 0, 0]])
     env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
