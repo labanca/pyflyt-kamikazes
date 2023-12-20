@@ -4,6 +4,7 @@ from __future__ import  annotations
 import math
 from copy import deepcopy
 from typing import Any
+from pprint import pprint
 
 import numpy as np
 import pandas as pd
@@ -311,28 +312,13 @@ class MAQuadXBaseEnv(ParallelEnv):
         DarkBlue = [0, 0, 0.8, 1]
         [self.aviary.changeVisualShape(drone.Id, -1, rgbaColor=DarkBlue)
          for i, drone in enumerate(self.aviary.drones)
-         if self.drone_classes[i] == 'lw']
+         if self.get_drone_type_by_id(i) == 'lw']
 
-        self.agent_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,0,0], lineWidth=2)
-        self.target_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1, 0, 0], lineWidth=2)
-        self.agent_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
-        self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
-
-        self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
-
-
-
-        # self.agent_forward_line = [self.draw_forward_vector(id+1) for id in self.agent_name_mapping.values()]
-        # self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
-        # self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
-        # self.agent_traj_line = [
-        #     self.draw_separation_vector(
-        #     id+1,
-        #     separation_vector=self.separation[id][self.find_nearest_drone(id)],
-        #     lineColorRGB=[0,1,0])
-        #     for id in self.agent_name_mapping.values()
-        # ]
-
+        # self.agent_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,0,0], lineWidth=2)
+        # self.target_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1, 0, 0], lineWidth=2)
+        # self.agent_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
+        # self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
+        # self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -406,6 +392,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             reward -= 100.0
             info["crashes"] = True
             term |= True
+            trunc |= True
 
         # exceed flight dome
         if np.linalg.norm(self.aviary.state(agent_id)[-1]) > self.flight_dome_size:
@@ -463,11 +450,15 @@ class MAQuadXBaseEnv(ParallelEnv):
         # set the new actions and send to aviary
         self.current_actions *= 0.0
 
-        for ag_id, ag in self.drone_id_mapping.items():
-            if self.drone_classes[ag_id] == 'lm':
-                self.current_actions[ag_id] = actions[ag]
-            elif self.drone_classes[ag_id] == 'lw':
-                self.current_actions[ag_id] = self.get_lw_action(ag)
+        live_uavs =  {key: value for key, value in self.drone_id_mapping.items()
+                            if value in self.agents
+                            or value in self.targets}
+
+        for id, uav in live_uavs.items():
+            if self.get_drone_type_by_id(id) == 'lm':
+                self.current_actions[id] = actions[uav]
+            elif self.get_drone_type_by_id(id) == 'lw':
+                self.current_actions[id] = self.get_lw_action(uav)
 
         self.aviary.set_all_setpoints(self.current_actions)
 
@@ -482,7 +473,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         for _ in range(self.env_step_ratio):
             self.aviary.step()
 
-            # Avoid losing detect a collision with aviary steps without a RL step.
+            # Avoid losing detect a collision with aviary steps without a RL step. Do not consider ground collision
             # Only breaks for the agents in self.agents (terminated agents do not stop the aviary steps)
             if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
                 break
@@ -507,14 +498,30 @@ class MAQuadXBaseEnv(ParallelEnv):
             # I believe this can be solved inside compute_term_trunc_reward_info_by_id with trunc |= true
 
             if terminations[ag] or truncations[ag]:
+                print(f'****** inittiating kill for agent {ag} ********')
+                print(f'{self.agents=}')
+                print(f'{self.targets=}')
+                print(f'{self.drone_list=}')
+                print(f'{self.drone_id_mapping=}')
+                print(f'{self.drone_classes=}')
+                pprint(f'contacts= {np.array(np.where(self.aviary.contact_array)) - 1}')
+                #print(f'{repr(self.aviary.contact_array)}')
+                print(f'------------------------------------')
+                print(f'disarming LM {ag} id: {ag_id}')
+                print(f'armed drones before: {[drone.Id for drone in self.aviary.armed_drones]}')
                 self.disarm_drone(ag_id)
+                print(f'armed drones after: {[drone.Id for drone in self.aviary.armed_drones]}')
 
                 collisions_ids = self.get_collision_ids(ag_id)
+                print(f'{collisions_ids=}')
                 for id in collisions_ids:
                     if self.drone_classes[id] == 'lw':
+                        print(f'disarming LW {self.drone_id_mapping[id]} id {id}')
                         self.disarm_drone(id)
-                        self.targets.remove(self.drone_id_mapping[id]) # remove the target
-
+                        if self.drone_id_mapping[id] in self.targets:
+                            print(f'removing from self.targets {self.drone_id_mapping[id]}')
+                            self.targets.remove(self.drone_id_mapping[id]) # remove the target
+                print('-----------------------------------------------------')
 
         # increment step count and cull dead agents for the next round
         self.step_count += 1
@@ -570,18 +577,18 @@ class MAQuadXBaseEnv(ParallelEnv):
 
     def get_drone_type(self, agent):
 
-        if self.uav_classes[agent] == 'lw':
+        if self.drone_classes[self.agents[agent]] == 'lw':
             return 'lw'
-        elif self.uav_classes[agent] == 'lm':
+        elif self.drone_classes[self.agents[agent]] == 'lm':
             return 'lm'
         else:
             return None
 
     def get_drone_type_by_id(self, agent_id):
 
-        if self.uav_classes[self.agents[agent_id]] == 'lw':
+        if self.drone_classes[agent_id] == 'lw':
             return 'lw'
-        elif self.uav_classes[self.agents[agent_id]] == 'lm':
+        elif self.drone_classes[agent_id] == 'lm':
             return 'lm'
         else:
             return None
@@ -605,11 +612,11 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.uav_mapping = np.array(['lm'] * len(self.agents) + ['lw'] * len(self.targets))
 
-        self.drone_id_mapping = {key: value for key, value in self.drone_id_mapping.items() if value in self.drone_list}
+        #self.drone_id_mapping = {key: value for key, value in self.drone_id_mapping.items() if value in self.drone_list}
 
         self.num_drones = len(self.agents) + len(self.targets)
 
-        self.drone_classes = dict(zip(self.drone_id_mapping.keys(), self.uav_mapping ))
+        #self.drone_classes = dict(zip(self.drone_id_mapping.keys(), self.uav_mapping ))
 
     def draw_forward_vector(self, drone_index, line_id = None, length=1.0, lineColorRGB=[1, 0, 0] ):
         # Calculate the forward vector based on the drone's orientation
@@ -745,3 +752,18 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         collisions = np.where(self.aviary.contact_array[self.aviary.drones[agent_id].Id][1:])[0]
         return collisions
+
+    def get_drone_aviary_id(self, uav):
+
+        return self.drone_id_mapping.keys()
+
+
+    def get_collission_matrix(self):
+
+        num_bodies = self.aviary.get_num_bodies()
+        self.collission_matrix = np.zeros((num_bodies, num_bodies), dtype=bool)
+
+
+        for collision in self.getContactPoints():
+            self.contact_array[collision[1], collision[2]] = True
+            self.contact_array[collision[2], collision[1]] = True

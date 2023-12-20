@@ -278,18 +278,15 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
                 a_min=-10.0,
                 a_max=None,
-                ) * (
-                    #~self.in_range[agent_id][target_id] &
+            ) * (
                     self.chasing[agent_id][target_id] * 1.0
-                    #self.in_cone[agent_id][target_id] * 1.0
-                   )
+                )
 
-            # TODO: tentar quando angulo for praticamente 0 dar 0 pra ele buscar as demais rewards.
             # reward for engaging the enemy
-            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id]+ 0.1) * (
-                self.chasing[agent_id][target_id]
-                * self.approaching[agent_id][target_id]
-                * 1.0
+            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id] + 0.1) * (
+                    self.chasing[agent_id][target_id]
+                    * self.approaching[agent_id][target_id]
+                    * 1.0
             )
 
             # reward for progressing to engagement
@@ -315,7 +312,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
             self.rewards[agent_id] += (
                     rew_closing_distance
-                    + rew_progress_eng
+                    #+ rew_progress_eng
                     + rew_engaging_enemy
                     #+ rew_last_distance
             )

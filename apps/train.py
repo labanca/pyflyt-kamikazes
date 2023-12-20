@@ -133,7 +133,7 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
 
             for a in env.agents:
                 rewards[a] += env.rewards[a]
-            if truncation:
+            if truncation : #and info.get('mission_complete') == True
                 print(f'terminate with {agent=} {termination=} {truncation=} {info=}')
                 break
             else:
@@ -194,7 +194,7 @@ seed=None
 
 #find a better way to store it
 spawn_settings = dict(
-    num_drones=8,
+    num_drones=2,
     min_distance=2.0,
     spawn_radius=5.0,
     center=(0, 0, 0),
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['num_lm'] = 4
+    env_kwargs['num_lm'] = 1
     env_kwargs['start_pos'], env_kwargs['start_orn']  = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[1, 1, 1], [-1, -1, 2]])
     #env_kwargs['start_orn'] =  #np.zeros_like(env_kwargs['start_pos']) np.array([[-1, -1, 2], [0, 0, 0]])
     env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
@@ -213,41 +213,35 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings']=spawn_settings
 
     #seed = 42
-    train_desc = """ self.approaching = self.current_distance < self.previous_distance
+    train_desc = """ Trying the same rewards of ma_quadx_hover_20231219-080504.zip, 1 LW, 1LM, but with the changes in the env (collisions mostly)
+    rew_closing_distance = np.clip(
+    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+    a_min=-10.0,
+    a_max=None,
+    ) * (
+        self.chasing[agent_id][target_id] * 1.0
+        )
 
-            # reward for closing the distance
-            rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                a_min=-10.0,
-                a_max=None,
-                ) * (
-                    #~self.in_range[agent_id][target_id] &
-                    self.chasing[agent_id][target_id] * 1.0
-                    #self.in_cone[agent_id][target_id] * 1.0
-                   )
+# reward for engaging the enemy
+rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id]+ 0.1) * (
+    self.chasing[agent_id][target_id]
+    * self.approaching[agent_id][target_id]
+    * 1.0
+)
 
-            # TODO: tentar quando angulo for praticamente 0 dar 0 pra ele buscar as demais rewards.
-            # reward for engaging the enemy
-            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id]+ 0.1) * (
-                self.chasing[agent_id][target_id]
-                * self.approaching[agent_id][target_id]
-                * 1.0
-            )
-
-            # reward for progressing to engagement
-            rew_progress_eng = (
-                    (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id])
-                    * 10.0
-                    * self.in_range[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-            )
-
+# reward for progressing to engagement
+rew_progress_eng = (
+        (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id])
+        * 10.0
+        * self.in_range[agent_id][target_id]
+        * self.approaching[agent_id][target_id]
+)
 """
 
     #Train a model (takes ~3 minutes on GPU)
-    #train_butterfly_supersuit(env_fn, steps=15_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
 
-    eval(env_fn, num_games=1, render_mode="human", **env_kwargs)
+    #eval(env_fn, num_games=1, render_mode="human", **env_kwargs)
