@@ -194,9 +194,9 @@ seed=None
 
 #find a better way to store it
 spawn_settings = dict(
-    num_drones=2,
-    min_distance=2.0,
-    spawn_radius=5.0,
+    num_drones=8,
+    min_distance=0,
+    spawn_radius=.1,
     center=(0, 0, 0),
     seed=seed,
 )
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['num_lm'] = 1
+    env_kwargs['num_lm'] = 4
     env_kwargs['start_pos'], env_kwargs['start_orn']  = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[1, 1, 1], [-1, -1, 2]])
     #env_kwargs['start_orn'] =  #np.zeros_like(env_kwargs['start_pos']) np.array([[-1, -1, 2], [0, 0, 0]])
     env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings']=spawn_settings
 
     #seed = 42
-    train_desc = """ Trying the same rewards of ma_quadx_hover_20231219-080504.zip, 1 LW, 1LM, but with the changes in the env (collisions mostly)
+    train_desc = """ Trying the same rewards of ma_quadx_hover_20231219-080504.zip, 4 LW, 4LM, but now with a collission radius of 0.4
     rew_closing_distance = np.clip(
     self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
     a_min=-10.0,
@@ -239,7 +239,7 @@ rew_progress_eng = (
 """
 
     #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=1_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

@@ -162,10 +162,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         x2 = self.current_distance
         self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
 
-        # Explicitly normalize vectors before calculating angles
-
-
-
         # self.previous_traj_angles = self.current_traj_angles.copy()
         normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
         # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
@@ -317,28 +313,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     #+ rew_last_distance
             )
 
-            #Debug, draw foward vectors
-            # self.agent_forward_line = self.draw_forward_vector(
-            #     agent_id + 1, line_id=self.agent_forward_line, length=0.35, lineColorRGB=[1, 0, 0]
-            # )
-            # self.target_forward_line = self.draw_forward_vector(
-            #     target_id + 1, line_id=self.target_forward_line, length=0.35, lineColorRGB=[0, 0, 1]
-            # )
-            #
-            # self.agent_vel_line = self.draw_vel_vector(
-            #     agent_id + 1, line_id=self.agent_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
-            # )
-            # self.target_vel_line = self.draw_vel_vector(
-            #     target_id + 1, line_id=self.target_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
-            # )
-            #
-            # self.target_traj_line = self.draw_separation_vector(
-            #     agent_id + 1,
-            #     line_id=self.agent_traj_line,
-            #     separation_vector=self.separation[target_id][agent_id],
-            #     lineColorRGB=[0, 1, 0]
-            # )
-
             # print(f'{self.current_angles=}')
             # print(f'{self.current_traj_angles=}')
             # print(f'{self.current_vel_angles=}')
@@ -353,48 +327,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             # if rew_last_distance != 0:
             #     print(f'rew last distance {rew_last_distance}')
             # print(f'------------------------------------------------------------')
-
-    # ang_vel_a, ang_pos_a, lin_vel_a, lin_pos_a, quaternion_a = self.compute_attitude_by_id(agent_id)
-    # ang_vel_t, ang_pos_t, lin_vel_t, lin_pos_t, quaternion_t = self.compute_attitude_by_id(agent_id)
-    # self.rew_log.append([self.aviary.elapsed_time,
-    #                      rew_closing_distance,
-    #                      rew_progress_eng,
-    #                      rew_engaging_enemy,
-    #                      rew_last_distance,
-    #                      ang_vel_a,
-    #                      ang_pos_a,
-    #                      lin_vel_a,
-    #                      lin_pos_a[0],
-    #                      lin_pos_a[1],
-    #                      lin_pos_a[2],
-    #                      quaternion_a,
-    #                      ang_vel_t,
-    #                      ang_pos_t,
-    #                      lin_vel_t,
-    #                      lin_pos_t[0],
-    #                      lin_pos_t[1],
-    #                      lin_pos_t[2],
-    #                      quaternion_t,
-    #                      self.current_distance[agent_id][target_id],
-    #                      self.current_angles[agent_id][target_id],
-    #
-    #                      ])
-    def lidar(self, allied_drone_position, enemy_positions):
-        # Convert positions to numpy arrays for easier calculations
-        allied_drone_position = np.array(allied_drone_position)
-        enemy_positions = np.array(enemy_positions)
-
-        # Calculate Euclidean distances between the allied drone and all enemy drones
-        distances = np.linalg.norm(enemy_positions - allied_drone_position, axis=1)
-
-        # Find the index of the nearest enemy drone
-        nearest_enemy_index = np.argmin(distances)
-
-        # Get the position of the nearest enemy drone
-        nearest_enemy_position = enemy_positions[nearest_enemy_index]
-
-        return nearest_enemy_position
-
 
     def bodie_info(self, agent_id, substring):
 
@@ -443,3 +375,30 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         return rz @ ry @ rx, forward_vector
 
 
+    def save_runtim_data_by_id(self, agent_id, target_id, **rew_kwargs):
+
+        ang_vel_a, ang_pos_a, lin_vel_a, lin_pos_a, quaternion_a = self.compute_attitude_by_id(agent_id)
+        ang_vel_t, ang_pos_t, lin_vel_t, lin_pos_t, quaternion_t = self.compute_attitude_by_id(target_id)
+        self.rew_log.append([
+            self.aviary.elapsed_time,
+             rew_kwargs['rew_closing_distance'],
+             rew_kwargs['rew_progress_eng'],
+             rew_kwargs['rew_engaging_enemy'],
+             rew_kwargs['rew_last_distance'],
+             ang_vel_a,
+             ang_pos_a,
+             lin_vel_a,
+             lin_pos_a[0],
+             lin_pos_a[1],
+             lin_pos_a[2],
+             quaternion_a,
+             ang_vel_t,
+             ang_pos_t,
+             lin_vel_t,
+             lin_pos_t[0],
+             lin_pos_t[1],
+             lin_pos_t[2],
+             quaternion_t,
+             self.current_distance[agent_id][target_id],
+             self.current_angles[agent_id][target_id],
+             ])
