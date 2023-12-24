@@ -1,0 +1,53 @@
+train_desc='trying to replicate ma_quadx_hover_20231221-061840.txt with less total_steps.\n            # reward for closing the distance\n            rew_closing_distance = np.clip(\n                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],\n                a_min=-10.0,\n                a_max=None,\n            ) * (\n                    self.chasing[agent_id][target_id] * 1.0\n                )\n\n            # reward for engaging the enemy\n            rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],\n                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (\n                    self.chasing[agent_id][target_id]\n                    * self.approaching[agent_id][target_id]\n                    * 1.0\n                )\n\n            # reward for maintaning linear velocities.\n            rew_speed_magitude =(\n                    (1.0 * self.current_magnitude[agent_id]**2)\n                    * self.chasing[agent_id][target_id]\n                    * self.approaching[agent_id][target_id]\n            )\n\n\n\n            self.rewards[agent_id] += (\n                    rew_closing_distance\n                    + rew_engaging_enemy\n                    + rew_speed_magitude\n            )\n'
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-21 16:12:11.271029
+elapsed_time=0:59:15.488635
+model.num_timesteps=2015232
+device=device(type='cuda')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[128, 128, 128]
+num_cpus=8
+num_vec_envs=8
+model.n_envs=8
+random_respawn=True
+spawn_settings={'num_drones': 2, 'min_distance': 2, 'spawn_radius': 5, 'center': (0, 0, 0), 'seed': None}
+completion_datetime=2023-12-21 17:11:26.759664
+env_kwargs={'num_lm': 1, 'start_pos': array([[-3.49770194, -3.16245174,  2.46972216],
+       [-3.49868823,  1.18659809,  3.18362764]]), 'start_orn': array([[-0.03704742,  0.89907547,  1.63325026],
+       [ 0.        ,  0.        ,  0.        ]]), 'flight_dome_size': 15.588457268119896, 'spawn_settings': {'num_drones': 2, 'min_distance': 2, 'spawn_radius': 5, 'center': (0, 0, 0), 'seed': None}}
+model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=33, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=128, out_features=4, bias=True)
+  (value_net): Linear(in_features=128, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

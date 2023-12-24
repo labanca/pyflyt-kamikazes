@@ -91,7 +91,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         )
 
-        self.lethal_distance = 0.15
+        self.lethal_distance = 0.4
         self.lethal_angle = 0.1
         self.sparse_reward = sparse_reward
         self.spawn_setting = spawn_settings
@@ -176,7 +176,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
         self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
-        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 3.0)  # I've tryed  2.0
+        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
 
 
 
@@ -194,7 +194,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # get all the relevant things
 
         self.last_obs_time = self.aviary.elapsed_time
-        target_id = self.find_nearest_drone(agent_id)
+        target_id = self.find_nearest_lw(agent_id)
 
 
         raw_state = self.compute_attitude_by_id(agent_id)
@@ -254,7 +254,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         reward += self.rewards[agent_id]
 
-
         return term, trunc, reward, info
 
 
@@ -263,7 +262,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # reset rewards
         self.rewards[agent_id] *= 0.0
 
-        target_id = self.find_nearest_drone(agent_id)
+        target_id = self.find_nearest_lw(agent_id)
         # sparse reward computation
         if not self.sparse_reward:
 
@@ -271,27 +270,51 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
             # reward for closing the distance
             rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 1.0,
                 a_min=-10.0,
                 a_max=None,
             ) * (
-                    self.chasing[agent_id][target_id] * 1.0
+                    self.chasing[agent_id][target_id]
                 )
 
             # reward for engaging the enemy
-            rew_engaging_enemy = 3.0 / (self.current_angles[agent_id][target_id] + 0.1) * (
+            rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
+                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (
                     self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
                     * 1.0
-            )
+                )
 
-            # reward for progressing to engagement
-            rew_progress_eng = (
+            # # reward for progressing to engagement
+            rew_near_engagement = (
                     (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id])
                     * 10.0
                     * self.in_range[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
             )
+
+            # reward for maintaning linear velocities.
+            rew_speed_magitude =(
+                    (self.current_magnitude[agent_id])
+                    * self.chasing[agent_id][target_id]
+                    * self.approaching[agent_id][target_id]
+            )
+
+
+
+            self.rewards[agent_id] += (
+                    rew_closing_distance
+                    + rew_engaging_enemy
+                    + rew_speed_magitude
+            )
+
+            rew_dict = dict(
+                rew_closing_distance=rew_closing_distance,
+                rew_engaging_enemy=rew_engaging_enemy,
+                rew_speed_magitude=rew_speed_magitude,
+            )
+
+            self.print_rewards(agent_id, **rew_dict)
 
             # reward for go to collission
             # rew_last_distance = (
@@ -302,40 +325,10 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             #       * self.in_cone
             #   )
 
-            ## reward for maintaning high speed.
-            #self.rewards[agent_id] += 1.0 * self.current_magnitude[agent_id] * self.chasing[agent_id][target_id]
-            #print(f'rew maintaning high speed {1.0 * self.current_magnitude[agent_id] * self.chasing[agent_id][target_id]}')
-
-            self.rewards[agent_id] += (
-                    rew_closing_distance
-                    #+ rew_progress_eng
-                    + rew_engaging_enemy
-                    #+ rew_last_distance
-            )
-
             # print(f'{self.current_angles=}')
             # print(f'{self.current_traj_angles=}')
             # print(f'{self.current_vel_angles=}')
             # print(f'-----------------------------------------')
-
-            # if rew_closing_distance != 0:
-            #     print(f'rew closing distance {rew_closing_distance}')
-            # if rew_progress_eng != 0:
-            #     print(f'rew progressing to engagement {rew_progress_eng}')
-            # if rew_engaging_enemy != 0:
-            #     print(f'rew engaging the enemy {rew_engaging_enemy}')
-            # if rew_last_distance != 0:
-            #     print(f'rew last distance {rew_last_distance}')
-            # print(f'------------------------------------------------------------')
-
-    def bodie_info(self, agent_id, substring):
-
-        if 0 <= agent_id < len(self.agents):
-            return substring in self.agents[agent_id]
-        else:
-            return False
-
-    #def create_lw(self, start_pos):
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -402,3 +395,11 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
              self.current_distance[agent_id][target_id],
              self.current_angles[agent_id][target_id],
              ])
+
+    def print_rewards(self, agent_id, **kargs):
+        for k,v in kargs.items():
+            print(f'{agent_id} {k} = {v}')
+
+        print(f'{self.current_magnitude[agent_id]=}')
+        print(f'{self.current_vel_angles[agent_id][1]=}')
+        print(f'------------------------------------------------------------')

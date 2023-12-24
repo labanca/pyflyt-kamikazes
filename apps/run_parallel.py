@@ -26,20 +26,20 @@ def get_start_pos_orn(num_drones, min_distance, spawn_radius, center, num_lm, se
 
     return start_pos, start_orn
 
-model = PPO.load('models/ma_quadx_hover_20231219-080504.zip')
+model = PPO.load('models/ma_quadx_hover_20231222-094047.zip')
 seed=None
 
 print((os.cpu_count() or 1))
 spawn_settings = dict(
-    num_drones=10,
-    min_distance=2.0,
-    spawn_radius=5.0,
+    num_drones=2,
+    min_distance=2,
+    spawn_radius=20,
     center=(0, 0, 0),
     seed=seed,
 )
 
 env_kwargs = {}
-env_kwargs['num_lm'] = 5
+env_kwargs['num_lm'] = 1
 env_kwargs['start_pos'], env_kwargs['start_orn'] = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) # np.array([[0, 0, 1], [4,0,1]])
 #env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
@@ -88,7 +88,7 @@ while env.agents:
         # print(f'{rewards=}\n')
         # print(f'{terminations=} {truncations=}\n')
         # print(f'{infos=}\n\n\n')
-        time.sleep(3)
+        time.sleep(5)
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')
