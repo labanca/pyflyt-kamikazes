@@ -63,7 +63,10 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         render_mode: None | str = None,
         uav_mapping: np.array = np.array(['lm', 'lm', 'lm', 'lm']),
         seed : int = None,
-        num_lm: int = None
+        num_lm: int = None,
+        formation_center: np.ndarray = np.array(
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+        ),
     ):
         """__init__.
 
@@ -88,6 +91,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             spawn_settings=spawn_settings,
             seed=seed,
             num_lm=num_lm,
+            formation_center=formation_center
 
         )
 
@@ -314,7 +318,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                 rew_speed_magitude=rew_speed_magitude,
             )
 
-            self.print_rewards(agent_id, **rew_dict)
+            #self.print_rewards(agent_id, **rew_dict)
 
             # reward for go to collission
             # rew_last_distance = (

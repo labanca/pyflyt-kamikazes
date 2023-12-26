@@ -13,7 +13,7 @@ from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
 
 from PyFlyt.core import Aviary
-from modules.lw_control import LWManager
+from modules.aviary_tests import LWManager
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
@@ -33,8 +33,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         agent_hz: int = 15,
         render_mode: None | str = None,
         seed: int = None,
-        num_lm: int = 1
-
+        num_lm: int = 1,
+        formation_center: np.ndarray = np.array(
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+        ),
     ):
         """__init__.
 
@@ -125,8 +127,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.start_orn = start_orn
         self.spawn_settings = spawn_settings
         self.seed = seed
-        self.num_lm = num_lm
+        self.num_lm = self.spawn_settings['num_lm'] # num_lm
         self.num_drones = len(start_pos)
+        self.formation_center = formation_center
+
         self.rew_log = [
             [
                 'self.aviary.elapsed_time'
@@ -264,6 +268,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.drone_id_mapping = dict(enumerate(self.drone_list))
         self.drone_classes = dict(enumerate(self.uav_mapping))
 
+
         self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
         self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
         self.in_range = np.zeros((self.num_drones,self.num_drones), dtype=bool)
@@ -292,7 +297,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
 
         if self.spawn_settings is not None:
-            self.start_pos, self.start_orn = self.get_start_pos_orn(**self.spawn_settings, num_lm=self.num_lm)
+            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
 
 
 
@@ -306,24 +311,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             seed=seed,
         )
 
-        formation = LWManager(self.start_pos, self.drone_classes, 6, 5.0)
-
-
-        LightBlue = [0.5, 0.5, 1, 1]
-        Red = [1, 0, 0, 1]
-        LightRed = [1, 0.5, 0.5, 1]
-        DarkBlue = [0, 0, 0.8, 1]
-        [self.aviary.changeVisualShape(drone.Id, -1, rgbaColor=DarkBlue)
-         for i, drone in enumerate(self.aviary.drones)
-         if self.get_drone_type_by_id(i) == 'lw']
-
-        # self.time_elapsed = self.aviary.addUserDebugText(
-        #     text=str(self.aviary.elapsed_time), textPosition=[2, 2, 2], textColorRGB=[1, 0, 0], )
-        self.agent_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,0,0], lineWidth=2)
-        self.target_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1, 0, 0], lineWidth=2)
-        self.agent_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
-        self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
-        self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
+        self.change_visuals()
+        #self.init_debug_vectors()
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -334,6 +323,18 @@ class MAQuadXBaseEnv(ParallelEnv):
         set_points = [6 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping)) ]
 
         self.aviary.set_mode(set_points)
+
+        self.update_control_lists()
+
+        self.manager = LWManager(start_pos=self.start_pos,
+                                 armed_uav_types=self.armed_uav_types,
+                                 uav_id_types=self.drone_classes,
+                                 formation_radius=1.0,
+                                 aviary=self.aviary,
+                                 detect_threat_radius=4.0,
+                                 shoot_range=2.0,
+                                 formation_center=self.formation_center
+                                 )
 
         # wait for env to stabilize
         for _ in range(10):
@@ -417,7 +418,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             trunc |= True
 
 
-
         # collide with any loyal wingmen
         colissions = self.get_type_collision(agent_id)
         if 'lw' in colissions:
@@ -470,16 +470,14 @@ class MAQuadXBaseEnv(ParallelEnv):
         # tune up the linear velocities
         #actions = {k: v * np.array([1, 1, 5, 5]) for k, v in actions.items()}
 
-
-
-
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
                 self.current_actions[id] = actions[uav]
-            elif self.get_drone_type_by_id(id) == 'lw':
-                self.current_actions[id] = self.get_lw_action(id)
+                self.aviary.set_setpoint(id, self.current_actions[id])
+            # elif self.get_drone_type_by_id(id) == 'lw':
+            #     self.current_actions[id] = self.get_lw_action(id)
 
-        self.aviary.set_all_setpoints(self.current_actions)
+        #self.aviary.set_all_setpoints(self.current_actions)
 
         # observation and rewards dictionary
         observations = dict()
@@ -491,11 +489,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         # step enough times for one RL step
         for _ in range(self.env_step_ratio):
 
-            self.control_drones(actions)
+            #self.control_drones(actions)
             self.aviary.step()
-        #     self.time_elapsed = self.aviary.addUserDebugText(
-        #     text=str(self.aviary.elapsed_time), textPosition=[2, 2, 2], textColorRGB=[1, 0, 0], replaceItemUniqueId=self.time_elapsed
-        # )
+            self.manager.compute_state()
+            self.manager.update()
+
             # Debug, draw vel forward and trajectory vectors
             #self.draw_debug_vectors()
 
@@ -505,6 +503,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 break
 
         self.collision_matrix = self.create_collision_matrix(distance_threshold=0.35)
+
         # update reward, term, trunc, for each agent
         for ag in self.agents:
             ag_id = self.agent_name_mapping[ag]
@@ -531,6 +530,8 @@ class MAQuadXBaseEnv(ParallelEnv):
                         self.disarm_drone(id)
                         if self.drone_id_mapping[id] in self.targets: # avoid double removing in the same iteration
                             self.targets.remove(self.drone_id_mapping[id])
+                        if self.drone_classes[id] == 'lw':
+                            pass
 
         # increment step count and cull dead agents for the next round
         self.step_count += 1
@@ -547,42 +548,57 @@ class MAQuadXBaseEnv(ParallelEnv):
             terminations = {k: True for k in self.agents}
             truncations = {k: True for k in self.agents}
             infos = {key: {'mission_complete': True, **infos[key]} for key in infos}
-
-
-        # Trunc if all lm are terminated (dead)
-        #if 'lm' not in self.uav_mapping[[self.agent_name_mapping[agent] for agent in self.agents]]:
-        # if all(terminations):
-        #      #truncations = {key: True for key in truncations}
-        #     truncations[ag] = True
-
-        # if all(terminations.values()) or all(truncations.values()):
-        #     df = pd.DataFrame(self.rew_log)
-        #
-        #     df.to_csv('rew_log.csv', float_format='%.4f', decimal='.', sep=';', index=False, header=False )
+            print(infos)
 
         return observations, rewards, terminations, truncations, infos
 
-    def get_start_pos_orn(self, num_drones, min_distance, spawn_radius, center, num_lm, seed=None):
-        start_pos = np.empty((num_drones, 3))
-        min_z = 1
+    #------------------------------ Env End ----------------------------------------------------
+
+    @staticmethod
+    def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0, num_lw=3, min_z=1.0,
+                               lm_center_bounds=5, lm_spawn_radius=10, num_lm=3,):
+
         np_random = np.random.RandomState(seed=seed)
+        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_spawn_radius),
+                               np.random.uniform(-lw_center_bounds, lw_spawn_radius),
+                               np.random.uniform(min_z, lw_spawn_radius + min_z)]
 
-        for i in range(num_drones):
-            while True:
-                # Generate random coordinates within the spawn area centered at 'center'
-                x = np_random.uniform(center[0] - spawn_radius, center[0] + spawn_radius)
-                y = np_random.uniform(center[1] - spawn_radius, center[1] + spawn_radius)
-                z = np_random.uniform(max(center[2], min_z), center[2] + spawn_radius)  # Ensure z-axis is within range
+        start_pos_lw = LWManager.generate_formation_pos(lw_formation_center, num_lw, lw_spawn_radius)
+        start_orn_lw = np.zeros_like(start_pos_lw)
 
-                # Check if the minimum distance condition is met with existing drones
-                if i == 0 or np.min(np.linalg.norm(start_pos[:i] - np.array([x, y, z]), axis=1)) >= min_distance:
-                    start_pos[i] = [x, y, z]
-                    break
+        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_spawn_radius),
+                               np.random.uniform(-lm_center_bounds, lm_spawn_radius),
+                               np.random.uniform(min_z, lm_spawn_radius + min_z)]
 
-        start_orn = (np_random.rand(num_drones, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
-        start_orn[num_lm:] = np.zeros((len(start_pos) - num_lm, 3), dtype=np.float64)
+        start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_spawn_radius,
+                                                                   lm_spawn_center, lm_spawn_radius, num_lm, min_z)
 
-        return start_pos, start_orn
+        start_orn_lm = (np_random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
+
+
+        return np.concatenate([start_pos_lm, start_pos_lw]), np.concatenate([start_orn_lm, start_orn_lw]), lw_formation_center
+
+
+    @staticmethod
+    def generate_random_coordinates(lw_formation_center, lw_spawn_radius, lm_spawn_center, lm_spawn_radius, num_lm,
+                                    min_z):
+        # Ensure the formation center and spawn center are NumPy arrays
+        lw_formation_center = np.array(lw_formation_center)
+        lm_spawn_center = np.array(lm_spawn_center)
+
+        # Generate random coordinates within the specified spawn radius and above the minimum z
+        lm_coordinates = []
+        while len(lm_coordinates) < num_lm:
+            x = np.random.uniform(low=lm_spawn_center[0] - lm_spawn_radius, high=lm_spawn_center[0] + lm_spawn_radius)
+            y = np.random.uniform(low=lm_spawn_center[1] - lm_spawn_radius, high=lm_spawn_center[1] + lm_spawn_radius)
+            z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
+
+            # Check if the generated coordinates are outside the exclusion area of the lw formation
+            lw_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
+            if lw_distance > lw_spawn_radius:
+                lm_coordinates.append([x, y, z])
+
+        return np.array(lm_coordinates)
 
     def get_drone_type(self, agent):
 
@@ -605,16 +621,6 @@ class MAQuadXBaseEnv(ParallelEnv):
     def get_lw_action(self, target_id):
 
         return np.array([*self.start_pos[target_id][0:2], 0, self.start_pos[target_id][2]])
-
-
-
-
-    def speed_ratio(self, agent_id):
-
-        speed_ratio = self.current_magnitude[agent_id] /(
-            self.past_magnitude[agent_id] if self.past_magnitude[agent_id] > 0 else 1)
-
-        return speed_ratio
 
 
     def update_control_lists(self):
@@ -838,3 +844,33 @@ class MAQuadXBaseEnv(ParallelEnv):
             if self.get_drone_type_by_id(id) == 'lw':
                 nearest_lm = self.find_nearest_lm(id)
                 self.current_actions[id] = self.get_lw_action(id)
+
+    def change_visuals(self):
+        LightBlue = [0.5, 0.5, 1, 1]
+        Red = [1, 0, 0, 1]
+        LightRed = [1, 0.5, 0.5, 1]
+        DarkBlue = [0, 0, 0.8, 1]
+        [self.aviary.changeVisualShape(drone.Id, -1, rgbaColor=DarkBlue)
+         for i, drone in enumerate(self.aviary.drones)
+         if self.get_drone_type_by_id(i) == 'lw']
+
+    def init_debug_vectors(self):
+        # self.time_elapsed = self.aviary.addUserDebugText(
+        #     text=str(self.aviary.elapsed_time), textPosition=[2, 2, 2], textColorRGB=[1, 0, 0], )
+        self.agent_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,0,0], lineWidth=2)
+        self.target_forward_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1, 0, 0], lineWidth=2)
+        self.agent_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
+        self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
+        self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
+
+    def save_data(self):
+        pass
+        #  if 'lm' not in self.uav_mapping[[self.agent_name_mapping[agent] for agent in self.agents]]:
+        # if all(terminations):
+        #      #truncations = {key: True for key in truncations}
+        #     truncations[ag] = True
+        #
+        # if all(terminations.values()) or all(truncations.values()):
+        #     df = pd.DataFrame(self.rew_log)
+        #
+        #     df.to_csv('rew_log.csv', float_format='%.4f', decimal='.', sep=';', index=False, header=False )
