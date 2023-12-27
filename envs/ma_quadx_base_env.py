@@ -13,7 +13,7 @@ from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
 
 from PyFlyt.core import Aviary
-from modules.aviary_tests import LWManager
+from modules.lwsfm import LWManager
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
@@ -128,9 +128,13 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.spawn_settings = spawn_settings
         self.seed = seed
         self.num_lm = self.spawn_settings['num_lm'] # num_lm
+        self.num_lw = self.spawn_settings['num_lw']
         self.num_drones = len(start_pos)
         self.formation_center = formation_center
+        self.lethal_distance = 0.4
+        self.lethal_angle = 0.1
 
+        self.rewards_data = []
         self.rew_log = [
             [
                 'self.aviary.elapsed_time'
@@ -268,6 +272,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.drone_id_mapping = dict(enumerate(self.drone_list))
         self.drone_classes = dict(enumerate(self.uav_mapping))
 
+        self.attitudes= np.zeros((self.num_drones, 4,3), dtype=np.float64)
+        self.drone_positions = np.zeros((self.num_drones, 3), dtype=np.float64)
 
         self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
         self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
@@ -295,11 +301,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
 
-
         if self.spawn_settings is not None:
             self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
-
-
 
         # rebuild the environment
         self.aviary = Aviary(
@@ -326,19 +329,19 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.update_control_lists()
 
-        self.manager = LWManager(start_pos=self.start_pos,
-                                 armed_uav_types=self.armed_uav_types,
-                                 uav_id_types=self.drone_classes,
+        self._compute_agent_states()
+
+        self.manager = LWManager(env=self,
                                  formation_radius=1.0,
-                                 aviary=self.aviary,
-                                 detect_threat_radius=4.0,
+                                 threat_radius=4.0,
                                  shoot_range=2.0,
-                                 formation_center=self.formation_center
                                  )
 
         # wait for env to stabilize
         for _ in range(10):
             self.aviary.step()
+
+
 
     def compute_auxiliary_by_id(self, agent_id: int):
         """This returns the auxiliary state form the drone."""
@@ -413,19 +416,23 @@ class MAQuadXBaseEnv(ParallelEnv):
         colissions = self.get_friendlyfire_type_collision(agent_id)
         if 'lm' in colissions:
             reward -= 100.0
-            info["friendly_fire"] = True
+            info["friendly_collision"] = True
             term |= True
             trunc |= True
 
-
         # collide with any loyal wingmen
-        colissions = self.get_type_collision(agent_id)
-        if 'lw' in colissions:
+        explosions = self.get_type_collision(agent_id)
+        if 'lw' in explosions:
             reward += 10000.0
             info["success"] = True
             term |= True
             trunc |= True
 
+        if 'lm' in explosions:
+            reward -= 1000.0
+            info["friendly_fire"] = True
+            term |= True
+            trunc |= True
 
         return term, trunc, reward, info
 
@@ -474,10 +481,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             if self.get_drone_type_by_id(id) == 'lm':
                 self.current_actions[id] = actions[uav]
                 self.aviary.set_setpoint(id, self.current_actions[id])
-            # elif self.get_drone_type_by_id(id) == 'lw':
-            #     self.current_actions[id] = self.get_lw_action(id)
-
-        #self.aviary.set_all_setpoints(self.current_actions)
 
         # observation and rewards dictionary
         observations = dict()
@@ -489,9 +492,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         # step enough times for one RL step
         for _ in range(self.env_step_ratio):
 
-            #self.control_drones(actions)
             self.aviary.step()
-            self.manager.compute_state()
+            self._compute_agent_states()
             self.manager.update()
 
             # Debug, draw vel forward and trajectory vectors
@@ -548,11 +550,96 @@ class MAQuadXBaseEnv(ParallelEnv):
             terminations = {k: True for k in self.agents}
             truncations = {k: True for k in self.agents}
             infos = {key: {'mission_complete': True, **infos[key]} for key in infos}
-            print(infos)
+            #print(infos)
 
         return observations, rewards, terminations, truncations, infos
 
+    # def _compute_agent_states(self) -> None:
+    #     """_compute_agent_states.
+    #
+    #     Args:
+    #
+    #     Returns:
+    #         None:
+    #     """
+    #
+    #     self.past_magnitude = self.current_magnitude.copy()
+    #     self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]
+    #
+    #     # get the states of all drones
+    #     self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
+    #     rotation, self.forward_vecs = MAQuadXBaseEnv.compute_rotation_forward(self.attitudes[:, 1])
+    #     self.drone_positions = self.attitudes[3,:]
+    #
+    #     # compute the vectors of each drone to each drone
+    #     self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
+    #     self.previous_distance = self.current_distance.copy()
+    #
+    #     # Compute the norm along the last axis for each pair of drones
+    #     self.current_distance = np.linalg.norm(self.separation, axis=-1)
+    #
+    #     # compute engagement angles (foward vectors angles?)
+    #     self.previous_angles = self.current_angles.copy()
+    #
+    #     x1 = np.sum(self.separation * self.forward_vecs, axis=-1)
+    #     x2 = self.current_distance
+    #     self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
+    #
+    #     # self.previous_traj_angles = self.current_traj_angles.copy()
+    #     normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
+    #     # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
+    #     # self.current_traj_angles = np.arccos(np.divide(x3, x2, where=x2 != 0))
+    #
+    #     self.previous_vel_angles = self.current_vel_angles.copy()
+    #     lin_vel = self.attitudes[: ,2]
+    #     normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
+    #     x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
+    #     self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
+    #
+    #
+    #     self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
+    #     self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
+    #     self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
+    #
+
     #------------------------------ Env End ----------------------------------------------------
+
+    @staticmethod
+    def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Computes the rotation matrix and forward vector of an aircraft given its orientation.
+
+        Args:
+            orn (np.ndarray): an [n, 3] array of each drone's orientation
+
+        Returns:
+            np.ndarray: an [n, 3, 3] rotation matrix of each aircraft
+            np.ndarray: an [n, 3] forward vector of each aircraft
+        """
+        c, s = np.cos(orn), np.sin(orn)
+        eye = np.stack([np.eye(3)] * orn.shape[0], axis=0)
+
+        rx = eye.copy()
+        rx[:, 1, 1] = c[..., 0]
+        rx[:, 1, 2] = -s[..., 0]
+        rx[:, 2, 1] = s[..., 0]
+        rx[:, 2, 2] = c[..., 0]
+        ry = eye.copy()
+        ry[:, 0, 0] = c[..., 1]
+        ry[:, 0, 2] = s[..., 1]
+        ry[:, 2, 0] = -s[..., 1]
+        ry[:, 2, 2] = c[..., 1]
+        rz = eye.copy()
+        rz[:, 0, 0] = c[..., 2]
+        rz[:, 0, 1] = -s[..., 2]
+        rz[:, 1, 0] = s[..., 2]
+        rz[:, 1, 1] = c[..., 2]
+
+        forward_vector = np.stack(
+            [c[..., 2] * c[..., 1], s[..., 2] * c[..., 1], -s[..., 1]], axis=-1
+        )
+
+        # order of operations for multiplication matters here
+        return rz @ ry @ rx, forward_vector
 
     @staticmethod
     def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0, num_lw=3, min_z=1.0,
@@ -594,8 +681,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
 
             # Check if the generated coordinates are outside the exclusion area of the lw formation
-            lw_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-            if lw_distance > lw_spawn_radius:
+            lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
+            if lm_distance > lw_spawn_radius * 2:
                 lm_coordinates.append([x, y, z])
 
         return np.array(lm_coordinates)
@@ -741,7 +828,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         lw_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lw'])
 
-        if not lw_indices.any():
+        if not lw_indices.any(): # TODO seems wrong
             return self.find_nearest_lm(agent_id)
 
         # Filter distances based on 'lw' indices
@@ -752,11 +839,18 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         return nearest_lw_index
 
-    def find_nearest_lm(self, agent_id: int) -> int:
+    def find_nearest_lm(self, agent_id: int, exclude_self = False) -> int:
         # Assuming compute_observation_by_id has been called to update self.current_distance
-        distances = self.current_distance[agent_id, :]
 
         self.update_control_lists()
+
+        distances = self.current_distance[agent_id, :]
+
+        if exclude_self:
+            lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm' and key != agent_id])
+        else:
+            lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
+
 
         lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
 
@@ -814,6 +908,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         return collision_matrix
 
 
+
+
     def draw_debug_vectors(self):
 
         self.agent_forward_line = self.draw_forward_vector(
@@ -837,13 +933,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             lineColorRGB=[0, 1, 0]
         )
 
-
-    def control_drones(self, actions):
-
-        for id, uav in self.armed_uavs.items():
-            if self.get_drone_type_by_id(id) == 'lw':
-                nearest_lm = self.find_nearest_lm(id)
-                self.current_actions[id] = self.get_lw_action(id)
 
     def change_visuals(self):
         LightBlue = [0.5, 0.5, 1, 1]
@@ -874,3 +963,61 @@ class MAQuadXBaseEnv(ParallelEnv):
         #     df = pd.DataFrame(self.rew_log)
         #
         #     df.to_csv('rew_log.csv', float_format='%.4f', decimal='.', sep=';', index=False, header=False )
+
+
+    def decode_observation(self, obs) -> dict:
+
+        ang_vel = obs[:3]
+        quaternion = obs[3:7]
+        lin_vel = obs[7:10]
+        lin_pos = obs[10:13]
+        aux_state = obs[13:17]
+        past_actions = obs[17:21]
+        ally_lin_vel = obs[21:24]
+        ally_lin_pos = obs[24:27]
+        ang_vel_target = obs[27:30]
+        quaternion_target = obs[30:34]
+        lin_vel_target = obs[34:37]
+        lin_pos_target = obs[37:40]
+
+        return {
+            "ang_vel": ang_vel,
+            "quaternion": quaternion,
+            "lin_vel": lin_vel,
+            "lin_pos": lin_pos,
+            "aux_state": aux_state,
+            "past_actions": past_actions,
+            "ally_lin_vel": ally_lin_vel,
+            "ally_lin_pos": ally_lin_pos,
+            "ang_vel_target": ang_vel_target,
+            "quaternion_target": quaternion_target,
+            "lin_vel_target": lin_vel_target,
+            "lin_pos_target": lin_pos_target
+        }
+
+    def print_obs_variables(self, obs):
+        ang_vel = obs[:3]
+        quaternion = obs[3:7]
+        lin_vel = obs[7:10]
+        lin_pos = obs[10:13]
+        aux_state = obs[13:17]
+        past_actions = obs[17:21]
+        ally_lin_vel = obs[21:24]
+        ally_lin_pos = obs[24:27]
+        ang_vel_target = obs[27:30]
+        quaternion_target = obs[30:34]
+        lin_vel_target = obs[34:37]
+        lin_pos_target = obs[37:40]
+
+        print(f"ang_vel: {ang_vel}")
+        print(f"quaternion: {quaternion}")
+        print(f"lin_vel: {lin_vel}")
+        print(f"lin_pos: {lin_pos}")
+        print(f"aux_state: {aux_state}")
+        print(f"past_actions: {past_actions}")
+        print(f"ally_lin_vel: {ally_lin_vel}")
+        print(f"ally_lin_pos: {ally_lin_pos}")
+        print(f"ang_vel_target: {ang_vel_target}")
+        print(f"quaternion_target: {quaternion_target}")
+        print(f"lin_vel_target: {lin_vel_target}")
+        print(f"lin_pos_target: {lin_pos_target}")

@@ -95,8 +95,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         )
 
-        self.lethal_distance = 0.4
-        self.lethal_angle = 0.1
+
         self.sparse_reward = sparse_reward
         self.spawn_setting = spawn_settings
 
@@ -104,7 +103,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 12,),
+            shape=(self.combined_space.shape[0] + 19,),
             dtype=np.float64,
         )
 
@@ -151,6 +150,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # get the states of all drones
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
         rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
+        self.drone_positions = self.attitudes[:, 3]
 
         # compute the vectors of each drone to each drone
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
@@ -199,20 +199,23 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         self.last_obs_time = self.aviary.elapsed_time
         target_id = self.find_nearest_lw(agent_id)
+        near_ally_id = self.find_nearest_lm(agent_id, exclude_self=True)
 
 
         raw_state = self.compute_attitude_by_id(agent_id)
         aux_state = self.compute_auxiliary_by_id(agent_id)
 
-        # # state breakdown
-        # ang_vel = raw_state[0]
-        # ang_pos = raw_state[1]
-        # lin_vel = raw_state[2]
-        # lin_pos = raw_state[3]
         ang_vel, ang_pos, lin_vel, lin_pos, quaternion = raw_state
 
-        target_attitude = self.aviary.state(target_id)
-        #target_attitude = self.compute_attitude_by_id(target_id)
+        near_ally_attitude = self.compute_attitude_by_id(near_ally_id)
+        ang_vel, ang_pos, lin_vel, lin_pos, quaternion = raw_state
+
+        ally_lin_vel = near_ally_attitude[2]
+        ally_lin_pos = near_ally_attitude[3]
+
+        # target_attitude = self.aviary.state(target_id)
+        target_attitude = self.compute_attitude_by_id(target_id)
+        ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quaternion_target = target_attitude
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -231,12 +234,19 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             return np.array(
                 [
                     *ang_vel,
-                    *quaternion,
+                    *np.array(quaternion),
                     *lin_vel,
                     *lin_pos,
                     *aux_state,
                     *self.past_actions[agent_id],
-                    *target_attitude.flatten(),
+
+                    *ally_lin_vel,
+                    *ally_lin_pos,
+
+                    *ang_vel_target,
+                    *np.array(quaternion_target),
+                    *lin_vel_target,
+                    *lin_pos_target,
                 ]
             )
         else:
@@ -249,7 +259,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         """Computes the termination, truncation, and reward of the current timestep."""
         term, trunc, reward, info = super().compute_base_term_trunc_reward_info_by_id(agent_id)
 
-        self._compute_agent_states()
+        #self._compute_agent_states()
 
         # don't recompute if we've already done it
         #if self.last_rew_time != self.aviary.elapsed_time and self.last_agent_id == agent_id:
@@ -298,7 +308,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             )
 
             # reward for maintaning linear velocities.
-            rew_speed_magitude =(
+            rew_speed_magnitude =(
                     (self.current_magnitude[agent_id])
                     * self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
@@ -309,30 +319,17 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             self.rewards[agent_id] += (
                     rew_closing_distance
                     + rew_engaging_enemy
-                    + rew_speed_magitude
+                    + rew_speed_magnitude
             )
 
-            rew_dict = dict(
-                rew_closing_distance=rew_closing_distance,
-                rew_engaging_enemy=rew_engaging_enemy,
-                rew_speed_magitude=rew_speed_magitude,
-            )
-
-            #self.print_rewards(agent_id, **rew_dict)
-
-            # reward for go to collission
-            # rew_last_distance = (
-            # self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]) *
-            #   (
-            #       10.0
-            #       * self.in_range[agent_id][target_id]
-            #       * self.in_cone
-            #   )
-
-            # print(f'{self.current_angles=}')
-            # print(f'{self.current_traj_angles=}')
-            # print(f'{self.current_vel_angles=}')
-            # print(f'-----------------------------------------')
+        step_data = {
+            "agent_id": agent_id,
+            "elapsed_time": self.aviary.elapsed_time,
+            "rew_closing_distance": rew_closing_distance,
+            "rew_engaging_enemy": rew_engaging_enemy,
+            "rew_speed_magnitude": rew_speed_magnitude,
+        }
+        self.rewards_data.append(step_data)
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -407,3 +404,45 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         print(f'{self.current_magnitude[agent_id]=}')
         print(f'{self.current_vel_angles[agent_id][1]=}')
         print(f'------------------------------------------------------------')
+
+    def save_rewards_data(self, filename):
+        # Save the rewards data to a file
+        import csv
+
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ["agent_id", "elapsed_time", "rew_closing_distance", "rew_engaging_enemy",
+                          "rew_speed_magnitude"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
+
+            # Write the data
+            for step_data in self.rewards_data:
+                writer.writerow(step_data)
+
+
+
+    def plot_rewards_data(self,filename):
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('TkAgg')
+
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(filename)
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+
+        for agent_id in df['agent_id'].unique():
+            agent_data = df[df['agent_id'] == agent_id]
+            plt.plot(agent_data['elapsed_time'], agent_data['rew_closing_distance'], label=f'Agent {agent_id}')
+
+        plt.xlabel('Elapsed Time')
+        plt.ylabel('Reward - Closing Distance')
+        plt.title('Rewards Over Time')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+

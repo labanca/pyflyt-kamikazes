@@ -1,11 +1,5 @@
-import copy
-import time
-import random
-
 import numpy as np
-import math
 from PyFlyt.core import Aviary
-
 
 class State:
     def __init__(self, lwfsm ):
@@ -23,136 +17,112 @@ class State:
 
 class IdleState(State):
     def enter(self):
-        print(f"Drone {self.drone_fsm.id} is entering idle state.")
-
+        #print(f"Drone {self.drone_fsm.id} is entering idle state.")
+        pass
 
     def execute(self):
         if self.drone_fsm.idle:
-            print(f"Drone {self.drone_fsm.id} is idling.")
+            #print(f"Drone {self.drone_fsm.id} is idling.")
             self.drone_fsm.idle = True
         if self.drone_fsm.detect_threat():
             self.drone_fsm.change_state('ChaseThreatState')
 
 
     def exit(self):
-        print(f"Drone {self.drone_fsm.id} is exiting idle state.")
+        #print(f"Drone {self.drone_fsm.id} is exiting idle state.")
         self.drone_fsm.idle = False
 
 class ThreatChaseState(State):
 
     def enter(self):
-        print(f"Drone {self.drone_fsm.id} is entering threat chase state.")
-        self.drone_fsm.chase_treat()
+        #print(f"Drone {self.drone_fsm.id} is entering threat chase state.")
+        self.drone_fsm.chase_threat()
 
     def execute(self):
             if not self.drone_fsm.chasing:
-                print(f"Drone {self.drone_fsm.id} is chasing a threat.")
+                #print(f"Drone {self.drone_fsm.id} is chasing a threat.")
                 self.drone_fsm.chasing = True
             if self.drone_fsm.shoot_distance_to_threat():
                 self.drone_fsm.change_state('ShootThreatState')
+            elif self.drone_fsm.drone_distance_pos(self.drone_fsm.current_threat_id,
+                                self.drone_fsm.current_threat_pos) > 0.3:
+                self.drone_fsm.chase_threat()
 
     def exit(self):
-        print(f"Drone {self.drone_fsm.id} is exiting threat chase state.")
+        #print(f"Drone {self.drone_fsm.id} is exiting threat chase state.")
         self.drone_fsm.chasing = False
 
 class ShootThreatState(State):
     def enter(self):
-        print(f"Drone {self.drone_fsm.id} is entering shoot threat state.")
+        #print(f"Drone {self.drone_fsm.id} is entering shoot threat state.")
+        pass
 
     def execute(self):
         if self.drone_fsm.gun_loaded:
             if self.drone_fsm.shoot_target():
-                print(f"Drone {self.drone_fsm.id} neutralized the threat.")
+                #print(f'Drone {self.drone_fsm.id} hit threat {self.drone_fsm.current_threat_id}!')
                 self.drone_fsm.change_state('GoToFormationState')
 
         elif not self.drone_fsm.reloading:
-            print(f"Drone {self.drone_fsm.id} gun is not loaded.")
+            #print(f"Drone {self.drone_fsm.id} gun is not loaded.")
             self.drone_fsm.reloading = True
 
 
     def exit(self):
-        print(f"Drone {self.drone_fsm.id} is exiting shoot threat state.")
+        #print(f"Drone {self.drone_fsm.id} is exiting shoot threat state.")
         self.drone_fsm.shooting = False
 
 class GoToFormationState(State):
     def enter(self):
-        print(f"Drone {self.drone_fsm.id} is entering go to formation state.")
+        #print(f"Drone {self.drone_fsm.id} is entering go to formation state.")
         self.drone_fsm.return_drone_to_formation()
 
 
     def execute(self):
         if not self.drone_fsm.returning:
-            print(f"Drone {self.drone_fsm.id} is going to formation.")
+            #print(f"Drone {self.drone_fsm.id} is going to formation.")
             self.drone_fsm.returning = True
 
-        if self.drone_fsm.detect_threat():
+        if self.drone_fsm.detect_threat() and self.drone_fsm.gun_loaded:
             self.drone_fsm.change_state('ChaseThreatState')
 
         elif self.drone_fsm.at_formation():
             self.drone_fsm.change_state('IdleState')
 
     def exit(self):
-        print(f"Drone {self.drone_fsm.id} is exiting go to formation state.")
+        #print(f"Drone {self.drone_fsm.id} is exiting go to formation state.")
         self.drone_fsm.returning = False
-
-class PatrolState(State):
-
-    def enter(self):
-        print(f"Drone {self.drone_fsm.id} is entering patrol state.")
-        target_pos = [element + random.uniform(-5, 5) for element in self.drone_fsm.manager.formation_center]
-        self.drone_fsm.manager.move_squad(self, target_pos)
-
-    def execute(self):
-        print(f"Drone {self.drone_fsm.id} is patrolling.")
-        if self.drone_fsm.detect_threat():
-            self.drone_fsm.half_distance_to_threat('threat_chase')
-
-    def exit(self):
-        print(f"Drone {self.drone_fsm.id} is exiting patrol state.")
-
-
 
 class LWManager:
 
-    def __init__(self, start_pos, armed_uav_types, uav_id_types, aviary, formation_radius, detect_threat_radius, shoot_range, formation_center):
-        self.armed_uav_types = armed_uav_types
-        self.uav_id_types = copy.deepcopy(uav_id_types)
-        self.env = aviary
-        self.threat_radius = detect_threat_radius
+    def __init__(self, env , formation_radius, threat_radius, shoot_range):
+        self.env = env
+        self.armed_uav_types = self.env.armed_uav_types
+        self.uav_id_types = self.env.drone_classes
+        self.aviary = self.env.aviary
+        self.threat_radius = threat_radius
         self.formation_radius = formation_radius
         self.max_velocity = np.linalg.norm(np.linalg.norm([6, 6, 6]))
-        self.num_drones = len(armed_uav_types)
-        self.num_lw = len([k for k,v in self.armed_uav_types.items() if v == 'lw'] )
-        self.num_lm = self.num_drones - self.num_lw
-        self.formation_center = formation_center
+        self.num_drones = self.env.num_drones
+        self.num_lw = self.env.num_lw
+        self.num_lm = self.env.num_lm
+        self.formation_center = self.env.formation_center
+        self.shoot_range = shoot_range
 
-        self.attitudes = np.stack(self.env.all_states, axis=0, dtype=np.float64)
-        self.current_distance = np.linalg.norm(self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1], axis=-1)
-        self.drone_positions = start_pos
+        self.attitudes = self.env.attitudes
+        self.current_distance = self.env.current_distance
+        self.drone_positions = self.env.drone_positions
+
+        # create the finite state machine for each lw drone inside LWManager
         self.squad = [LWFSM(lw_id=k,
-                            detect_thread_radius=detect_threat_radius,
+                            threat_radius=threat_radius,
                             shoot_range=shoot_range,
-                            manager=self) for k, v in armed_uav_types.items() if v == 'lw']
-
-    def compute_state(self):
-
-        self.attitudes = np.stack(self.env.all_states, axis=0, dtype=np.float64)
-        self.current_distance = np.linalg.norm(self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1], axis=-1)
-        self.drone_positions = np.vstack([self.get_all_lm_postions(), self.get_all_lw_positions()])
+                            manager=self) for k, v in self.env.armed_uav_types.items() if v == 'lw']
 
     def update(self):
 
-        for lw in self.squad:
-            lw.update()
-
-
-    def get_all_lm_postions(self):
-
-        return [self.attitudes[id][3] for id, type in self.uav_id_types.items() if type == 'lm']
-
-    def get_all_lw_positions(self,):
-
-        return [self.attitudes[id][3] for id, type in self.uav_id_types.items() if type == 'lw']
+        for lwfsw in self.squad:
+            lwfsw.update()
 
     @staticmethod
     def generate_formation_pos( formation_center, num_drones, radius=0.5, min_z = 1.0):
@@ -174,7 +144,6 @@ class LWManager:
 
         return np.array(drone_positions)
 
-
     def get_squad_setpoints(self):
         """
         Generates setpoints for a squad of drones to move to a location while maintaining formation.
@@ -188,7 +157,7 @@ class LWManager:
         Returns:
         A list of numpy arrays, each representing the setpoint for an individual drone.
         """
-        positions = self.generate_formation_pos(self.formation_center, self.num_lw)
+        positions = self.generate_formation_pos(self.env.formation_center, self.env.num_lw)
         setpoints = []
 
         for position in positions:
@@ -202,27 +171,26 @@ class LWManager:
         squad_setpoints = self.get_squad_setpoints(target_pos)
 
         for lw in self.squad:
-            self.env.set_setpoint(lw.id, squad_setpoints[lw.id])
+            self.aviary.set_setpoint(lw.id, squad_setpoints[lw.id])
 
-
+# Finite State machine to handle the lw drones
 class LWFSM:
 
     def __init__(self,
                  lw_id : int,
                  manager: LWManager,
-                 detect_thread_radius: float,
+                 threat_radius: float,
                  shoot_range: float,
                  ):
         self.last_shot_time = 0
         self.current_threat_id = None
         self.current_threat_pos = None
         self.id = lw_id
-        self.thread_radius = detect_thread_radius
+        self.thread_radius = threat_radius
         self.shoot_range = shoot_range
         self.manager = manager
         self.states = {
             'IdleState': IdleState(self),
-            'PatrolSate': PatrolState(self),
             'ChaseThreatState': ThreatChaseState(self),
             'ShootThreatState': ShootThreatState(self),
             'GoToFormationState': GoToFormationState(self),
@@ -236,7 +204,6 @@ class LWFSM:
         self.returning = False
         self.idle = False
 
-
     def change_state(self, new_state):
         self.current_state.exit()
         self.current_state = self.states[new_state]
@@ -247,21 +214,25 @@ class LWFSM:
         self.current_state.execute()
 
     def upkeep(self):
-        if abs(self.manager.env.elapsed_time - self.last_shot_time) >= self.recharge_time:
+        if abs(self.manager.aviary.elapsed_time - self.last_shot_time) >= self.recharge_time:
             self.gun_loaded = True
+
+    def drone_distance_pos(self, drone_id, vector):
+
+        return np.linalg.norm(self.manager.env.drone_positions[drone_id, :] - vector)
 
     def detect_threat(self):
         # Replace with actual logic to detect a threat
 
-        nearest_threat = self.find_nearest_lm()
+        nearest_threat = self.manager.env.find_nearest_lm(self.id) #self.manager.env.find_nearest_lm(self.id)
 
         if nearest_threat is None:
             return False
 
-        if self.manager.current_distance[self.id][nearest_threat] < self.thread_radius:
+        if self.manager.env.current_distance[self.id][nearest_threat] < self.thread_radius:
 
             self.current_threat_id = nearest_threat
-            self.current_threat_pos = self.manager.attitudes[nearest_threat, 3]
+            self.current_threat_pos = self.manager.env.drone_positions[nearest_threat]
             return True
         else:
             self.current_threat_id = None
@@ -270,33 +241,33 @@ class LWFSM:
 
     def shoot_distance_to_threat(self):
         # Return True if the LW is at shoot range from the threat
-        if self.manager.current_distance[self.id][self.current_threat_id] <= self.shoot_range:
+        if self.manager.env.current_distance[self.id][self.current_threat_id] <= self.shoot_range:
             return True
         else:
             return False
 
     def at_formation(self):
-        if abs(self.manager.drone_positions[self.id].sum() - self.current_setpoint.sum()) < 0.1:
+        if abs(self.manager.env.drone_positions[self.id].sum() - self.current_setpoint.sum()) < 0.1:
             return True
         else:
             return False
 
-    def find_nearest_lm(self,):
-        # Assuming compute_observation_by_id has been called to update self.current_distance
-        distances = self.manager.current_distance[self.id, :]
-
-        lm_indices = np.array([key for key, value in self.manager.armed_uav_types.items() if value == 'lm'])
-
-        if lm_indices.size == 0:
-            return None
-
-        # Filter distances based on 'lw' indices
-        lm_distances = distances[lm_indices]
-
-        # Find the index of the minimum distance in lw_distances
-        nearest_lm_index = lm_indices[np.argmin(lm_distances)]
-
-        return nearest_lm_index
+    # def find_nearest_lm(self,):
+    #     # Assuming compute_observation_by_id has been called to update self.current_distance
+    #     distances = self.manager.env.current_distance[self.id, :]
+    #
+    #     lm_indices = np.array([key for key, value in self.manager.env.armed_uav_types.items() if value == 'lm'])
+    #
+    #     if lm_indices.size == 0:
+    #         return None
+    #
+    #     # Filter distances based on 'lm' indices
+    #     lm_distances = distances[lm_indices]
+    #
+    #     # Find the index of the minimum distance in lw_distances
+    #     nearest_lm_index = lm_indices[np.argmin(lm_distances)]
+    #
+    #     return nearest_lm_index
 
     def return_drone_to_formation(self):
         """
@@ -316,9 +287,9 @@ class LWFSM:
         self.current_setpoint = setpoint
 
         # Send the setpoint to the drone to move it back to formation
-        self.manager.env.set_setpoint(self.id, setpoint)
+        self.manager.aviary.set_setpoint(self.id, setpoint)
 
-    def chase_treat(self,):
+    def chase_threat(self,):
         """
         Moves the LW to the halfway point between its current position and the threat's position.
 
@@ -329,7 +300,7 @@ class LWFSM:
         lw_position: A numpy array representing the LW's current position (x, y, z).
         """
 
-        lw_position = self.manager.drone_positions[self.id]
+        lw_position = self.manager.env.drone_positions[self.id]
 
         # Calculate the direction vector from the LW to the threat
         direction_vector = self.current_threat_pos - lw_position
@@ -344,7 +315,7 @@ class LWFSM:
         self.current_setpoint = setpoint
 
         # Send the setpoint to the LW
-        self.manager.env.set_setpoint(self.id, setpoint)
+        self.manager.aviary.set_setpoint(self.id, setpoint)
 
     def shoot_target(self,):
         """
@@ -360,17 +331,13 @@ class LWFSM:
           True if a target was hit and disarmed, False otherwise.
         """
 
-
         # Check if weapon is ready (cooldown elapsed)
         if self.gun_loaded:
-            # Get states of drones within radius
-            target_drone_state = self.manager.attitudes[self.current_threat_id]
-            target_drone_velocity = target_drone_state[2, :]
-
-            if self.manager.current_distance[self.id][self.current_threat_id] < self.shoot_range:
+            if self.manager.env.current_distance[self.id][self.current_threat_id] < self.shoot_range:
 
                 # Calculate hit probability based on velocity
-                velocity_magnitude = np.linalg.norm(target_drone_velocity)
+                #target_drone_velocity = self.manager.env.attitudes[self.current_threat_id][2, :]
+                velocity_magnitude = self.manager.env.current_magnitude[self.current_threat_id] #np.linalg.norm(target_drone_velocity)
                 max_hit_probability = 0.9
                 hit_probability = max_hit_probability - velocity_magnitude / self.manager.max_velocity
 
@@ -378,26 +345,27 @@ class LWFSM:
                 hit = np.random.random() < hit_probability
 
                 if hit:
-                    print(f'Drone {self.id} hit threat {self.current_threat_id}!')
+
                     # Disarm the target drone if hit
-                    self.disarm_drone(self.manager.env, self.current_threat_id)
-                    self.last_shot_time = self.manager.env.elapsed_time  # Update last shot time
+                    self.manager.env.disarm_drone(self.current_threat_id)
+
+                    self.last_shot_time = self.manager.aviary.elapsed_time  # Update last shot time
                     self.gun_loaded = False
 
-                    if self.current_threat_id in self.manager.armed_uav_types.keys():
-                        self.manager.armed_uav_types.pop(self.current_threat_id)
+                    if self.current_threat_id in self.manager.env.armed_uav_types.keys():
+                        self.manager.env.armed_uav_types.pop(self.current_threat_id)
 
                     self.current_threat_id = None
                     self.current_threat_pos = None
 
                     return True
                 else:
-                    print(f'Drone {self.id} miss {self.current_threat_id}!')
+                    #print(f'Drone {self.id} miss {self.current_threat_id}!')
                     return False  # No targets in range
             else:
                 return False  # Weapon o"n cooldown
         else:
-            print(f'Drone {self.id} gun is not loaded!')
+            #print(f'Drone {self.id} gun is not loaded!')
             return False
 
     def disarm_drone(self, env, agent_id):
@@ -408,68 +376,3 @@ class LWFSM:
 
         env.set_armed(armed_status_list)
 
-# -------- TEST ---------------------------
-
-
-# formation_center = np.array([0, 0, 2])
-# num_lm = 3
-# num_lw = 3
-# num_drones = num_lm + num_lw
-# formation_radius = 1
-#
-# start_pos = LWManager.generate_formation_pos(formation_center, num_lw, formation_radius)
-# threat_pos = np.array([4, 0, 5])
-#
-# threat_pos2 = np.array([-5, 0, 5])
-# threat_pos3 = np.array([4.5, 1, 5])
-#
-#
-# start_pos = np.vstack([threat_pos, threat_pos2, threat_pos3, start_pos])
-# start_orn = np.zeros_like(start_pos)
-# render_mode = 'human'
-# drone_options = dict()
-# seed=None
-#
-# env = Aviary(
-#             start_pos=start_pos,
-#             start_orn=start_orn,
-#             drone_type="quadx",
-#             render=bool(render_mode),
-#             drone_options=drone_options,
-#             seed=seed,
-#         )
-#
-# detect_threat_radius = 5
-# shoot_range = 2
-# armed_uav_types = {i: 'lm' if i < num_lm else 'lw' for i in range(num_drones)}
-# uav_id_types = {i: 'lm' if i < num_lm else 'lw' for i in range(num_drones)}
-#
-#
-# DarkBlue = [0, 0, 0.8, 1]
-# [env.changeVisualShape(drone.Id, -1, rgbaColor=DarkBlue)
-#  for i, drone in enumerate(env.drones)
-#  if uav_id_types[i] == 'lw']
-#
-# manager = LWManager(start_pos=start_pos,
-#                     armed_uav_types=armed_uav_types,
-#                     uav_id_types=uav_id_types,
-#                     aviary=env,
-#                     formation_radius=formation_radius,
-#                     detect_threat_radius=detect_threat_radius,
-#                     shoot_range=shoot_range,
-#                     formation_center=formation_center)
-#
-# env.set_mode(7)
-#
-#
-# # Step 6: step the physics
-# for i in range(10000):
-#     env.step()
-#     manager.compute_state()
-#     manager.update()
-#
-#     if i == 300:
-#         env.set_setpoint(1, np.array([0, 0, 0, 2]))
-#
-# # Gracefully close
-# env.close()

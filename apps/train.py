@@ -100,9 +100,6 @@ def train_butterfly_supersuit(
         file.write(f'{model.policy_aliases=}\n')
         file.write(f'{model.policy_class=}\n')
 
-
-
-
     env.close()
 
 
@@ -174,93 +171,41 @@ class EZPEnv(EzPickle, MAQuadXHoverEnv):
         MAQuadXHoverEnv.__init__(self, *args, **kwargs)
 
 
-def get_start_pos_orn(num_drones, min_distance, spawn_radius, center, num_lm, seed=None):
-    start_pos = np.empty((num_drones, 3))
-    min_z = 1
-    np_random = np.random.RandomState(seed=seed)
-
-    for i in range(num_drones):
-        while True:
-            # Generate random coordinates within the spawn area centered at 'center'
-            x = np_random.uniform(center[0] - spawn_radius, center[0] + spawn_radius)
-            y = np_random.uniform(center[1] - spawn_radius, center[1] + spawn_radius)
-            z = np_random.uniform(max(center[2], min_z), center[2] + spawn_radius)  # Ensure z-axis is within range
-
-            # Check if the minimum distance condition is met with existing drones
-            if i == 0 or np.min(np.linalg.norm(start_pos[:i] - np.array([x, y, z]), axis=1)) >= min_distance:
-                start_pos[i] = [x, y, z]
-                break
-
-    start_orn = (np_random.rand(num_drones, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
-    start_orn[num_lm:] = np.zeros((len(start_pos) - num_lm, 3), dtype=np.float64)
-
-    return start_pos, start_orn
-
-import numpy as np
-
-def get_start_pos_orn_scenario1(num_drones, min_distance, spawn_radius, center, num_lm, lw_spawn_radius_ratio=0.25, seed=None):
-    start_pos = np.empty((num_drones, 3))
-    min_z = 1
-    np_random = np.random.RandomState(seed=seed)
-
-    # Calculate the radius within which lw drones can spawn
-    lw_spawn_radius = lw_spawn_radius_ratio * spawn_radius
-
-    for i in range(num_drones):
-        while True:
-            # Generate random coordinates
-            x = np_random.uniform(center[0] - spawn_radius, center[0] + spawn_radius)
-            y = np_random.uniform(center[1] - spawn_radius, center[1] + spawn_radius)
-            z = np_random.uniform(max(center[2], min_z), center[2] + spawn_radius)
-
-            if i < num_lm:
-                # For lm drones, check if the generated coordinates are outside the lw_spawn_radius in 3D
-                while np.linalg.norm([x - center[0], y - center[1], z - center[2]]) < lw_spawn_radius:
-                    x = np_random.uniform(center[0] - spawn_radius, center[0] + spawn_radius)
-                    y = np_random.uniform(center[1] - spawn_radius, center[1] + spawn_radius)
-                    z = np_random.uniform(max(center[2], min_z), center[2] + spawn_radius)
-
-            # Check if the minimum distance condition is met with existing drones
-            if i == 0 or np.min(np.linalg.norm(start_pos[:i] - np.array([x, y, z]), axis=1)) >= min_distance:
-                start_pos[i] = [x, y, z]
-                break
-
-    start_orn = (np_random.rand(num_drones, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
-    start_orn[num_lm:] = np.zeros((len(start_pos) - num_lm, 3), dtype=np.float64)
-
-    return start_pos, start_orn
-
 seed=None
 
-#find a better way to store it
 spawn_settings = dict(
-    num_drones=2,
-    min_distance=2,
-    spawn_radius=5,
-    center=(0, 0, 0),
-    seed=seed,
+    lw_center_bounds=5.0,
+    lm_center_bounds=5,
+    lw_spawn_radius=1.0,
+    lm_spawn_radius=10,
+    min_z=1.0,
+    seed=None,
+    num_lw=5,
+    num_lm=10,
 )
+
 
 if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['num_lm'] = 1
-    env_kwargs['start_pos'], env_kwargs['start_orn']  = get_start_pos_orn(**spawn_settings, num_lm=env_kwargs['num_lm']) #np.array([[1, 1, 1], [-1, -1, 2]])
-    #env_kwargs['start_orn'] =  #np.zeros_like(env_kwargs['start_pos']) np.array([[-1, -1, 2], [0, 0, 0]])
-    env_kwargs['flight_dome_size'] = (6.75 * (spawn_settings['spawn_radius'] + 1) ** 2) ** 0.5  # dome size 50% bigger than the spawn radius
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+        'formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
+    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
+                                      spawn_settings[
+                                          'lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
     env_kwargs['seed'] = seed
     env_kwargs['spawn_settings'] = spawn_settings
 
     #seed = 42
-    train_desc = """10 times more rew_closing_distance and 3 times more rew_speed_magitude with less requirement of magnitude.
+    train_desc = """LW no fight back.
             # reward for closing the distance
             rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 1.0,
                 a_min=-10.0,
                 a_max=None,
             ) * (
-                    self.chasing[agent_id][target_id] * 10.0
+                    self.chasing[agent_id][target_id]
                 )
 
             # reward for engaging the enemy
@@ -273,12 +218,10 @@ if __name__ == "__main__":
 
             # reward for maintaning linear velocities.
             rew_speed_magitude =(
-                    (3.0 if self.current_magnitude[agent_id] > 3.0 else 0.0)
+                    (self.current_magnitude[agent_id])
                     * self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
             )
-
-
 
             self.rewards[agent_id] += (
                     rew_closing_distance
@@ -288,7 +231,7 @@ if __name__ == "__main__":
 """
 
     #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=15_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=20_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
