@@ -1,5 +1,6 @@
 import numpy as np
-from PyFlyt.core import Aviary
+from PyFlyt.pz_envs.quadx_envs.ma_quadx_hover_env import MAQuadXBaseEnv
+
 
 class State:
     def __init__(self, lwfsm ):
@@ -95,7 +96,7 @@ class GoToFormationState(State):
 
 class LWManager:
 
-    def __init__(self, env , formation_radius, threat_radius, shoot_range):
+    def __init__(self, env: MAQuadXBaseEnv , formation_radius, threat_radius, shoot_range):
         self.env = env
         self.armed_uav_types = self.env.armed_uav_types
         self.uav_id_types = self.env.drone_classes
@@ -109,6 +110,7 @@ class LWManager:
         self.formation_center = self.env.formation_center
         self.shoot_range = shoot_range
 
+        self.downed_lm = {k: 0 for k, v in self.env.armed_uav_types.items() if v == 'lm'}
         self.attitudes = self.env.attitudes
         self.current_distance = self.env.current_distance
         self.drone_positions = self.env.drone_positions
@@ -119,10 +121,13 @@ class LWManager:
                             shoot_range=shoot_range,
                             manager=self) for k, v in self.env.armed_uav_types.items() if v == 'lw']
 
-    def update(self):
+    def update(self, stand_still = False):
 
         for lwfsw in self.squad:
-            lwfsw.update()
+            if not stand_still:
+                lwfsw.update()
+
+
 
     @staticmethod
     def generate_formation_pos( formation_center, num_drones, radius=0.5, min_z = 1.0):
@@ -147,12 +152,6 @@ class LWManager:
     def get_squad_setpoints(self):
         """
         Generates setpoints for a squad of drones to move to a location while maintaining formation.
-
-        Args:
-        setpoint: A numpy array representing the target location for the central drone,
-                   in the format [x, y, r, z].
-        num_drones: The number of drones in the squad.
-        radius: The desired radius of the squad formation.
 
         Returns:
         A list of numpy arrays, each representing the setpoint for an individual drone.
@@ -224,7 +223,7 @@ class LWFSM:
     def detect_threat(self):
         # Replace with actual logic to detect a threat
 
-        nearest_threat = self.manager.env.find_nearest_lm(self.id) #self.manager.env.find_nearest_lm(self.id)
+        nearest_threat = self.find_nearest_lm() #self.manager.env.find_nearest_lm(self.id)
 
         if nearest_threat is None:
             return False
@@ -252,33 +251,10 @@ class LWFSM:
         else:
             return False
 
-    # def find_nearest_lm(self,):
-    #     # Assuming compute_observation_by_id has been called to update self.current_distance
-    #     distances = self.manager.env.current_distance[self.id, :]
-    #
-    #     lm_indices = np.array([key for key, value in self.manager.env.armed_uav_types.items() if value == 'lm'])
-    #
-    #     if lm_indices.size == 0:
-    #         return None
-    #
-    #     # Filter distances based on 'lm' indices
-    #     lm_distances = distances[lm_indices]
-    #
-    #     # Find the index of the minimum distance in lw_distances
-    #     nearest_lm_index = lm_indices[np.argmin(lm_distances)]
-    #
-    #     return nearest_lm_index
 
     def return_drone_to_formation(self):
         """
         Returns a drone to its original position within the formation.
-
-        Args:
-        env: The environment object with the `set_setpoint` function.
-        drone_id: The ID of the drone that has left the formation.
-        leader_center: The current center of the formation (leader's position).
-        num_drones: The total number of drones in the squad.
-        radius: The desired radius of the formation.
         """
 
         # Get the original position of the drone based on its ID
@@ -292,12 +268,6 @@ class LWFSM:
     def chase_threat(self,):
         """
         Moves the LW to the halfway point between its current position and the threat's position.
-
-        Args:
-        env: The environment object with the `set_setpoint` function.
-        lw_id: The ID of the LW to move.
-        threat_position: A numpy array representing the threat's position (x, y, z).
-        lw_position: A numpy array representing the LW's current position (x, y, z).
         """
 
         lw_position = self.manager.env.drone_positions[self.id]
@@ -322,11 +292,6 @@ class LWFSM:
         Simulates shooting at a target drone within a specified radius,
         considering weapon cooldown.
 
-        Args:
-          env: The environment object with functions to get drone states and disarm drones.
-          drone_id: The ID of the drone attempting to shoot.
-          radius: The radius within which to search for targets.
-
         Returns:
           True if a target was hit and disarmed, False otherwise.
         """
@@ -347,7 +312,8 @@ class LWFSM:
                 if hit:
 
                     # Disarm the target drone if hit
-                    self.manager.env.disarm_drone(self.current_threat_id)
+                    #self.manager.env.disarm_drone(self.current_threat_id)
+                    self.manager.downed_lm[self.current_threat_id] +=1
 
                     self.last_shot_time = self.manager.aviary.elapsed_time  # Update last shot time
                     self.gun_loaded = False
@@ -368,6 +334,8 @@ class LWFSM:
             #print(f'Drone {self.id} gun is not loaded!')
             return False
 
+
+
     def disarm_drone(self, env, agent_id):
 
         armed_drones_ids = {drone.Id for drone in env.armed_drones}
@@ -376,3 +344,19 @@ class LWFSM:
 
         env.set_armed(armed_status_list)
 
+    def find_nearest_lm(self, ):
+        # Assuming compute_observation_by_id has been called to update self.current_distance
+        distances = self.manager.current_distance[self.id, :]
+
+        lm_indices = np.array([key for key, value in self.manager.env.armed_uav_types.items() if value == 'lm'])
+
+        if lm_indices.size == 0:
+            return None
+
+        # Filter distances based on 'lw' indices
+        lm_distances = distances[lm_indices]
+
+        # Find the index of the minimum distance in lw_distances
+        nearest_lm_index = lm_indices[np.argmin(lm_distances)]
+
+        return nearest_lm_index

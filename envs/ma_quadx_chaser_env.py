@@ -4,6 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 from gymnasium import spaces
 from typing import Any
 
@@ -103,7 +104,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 19,),
+            shape=(self.combined_space.shape[0] + 20,),
             dtype=np.float64,
         )
 
@@ -145,43 +146,60 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         """
 
         self.past_magnitude = self.current_magnitude.copy()
-        self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]
+        self.previous_distance = self.current_distance.copy()
+        self.previous_angles = self.current_angles.copy()
+        self.previous_vel_angles = self.current_vel_angles
 
         # get the states of all drones
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
-        rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
+        self.linear_velocities = self.attitudes[:, 2]
         self.drone_positions = self.attitudes[:, 3]
+        self.current_magnitude = [np.linalg.norm(action) for action in self.current_actions]
+
+        rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
+        self.forward_vecs_repeated = np.repeat(self.forward_vecs[np.newaxis, :, :], len(self.attitudes), axis=0)
 
         # compute the vectors of each drone to each drone
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
-        self.previous_distance = self.current_distance.copy()
 
         # Compute the norm along the last axis for each pair of drones
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
-        # compute engagement angles (foward vectors angles?)
-        self.previous_angles = self.current_angles.copy()
+        # compute angles between trajectory and velocity vectors
+        dot_products = np.sum(self.separation * self.linear_velocities, axis=-1)
+        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.linear_velocities)
+        cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
+        self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
 
+
+        # compute engagement angles (foward vectors angles?)
         x1 = np.sum(self.separation * self.forward_vecs, axis=-1)
         x2 = self.current_distance
-        self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
+        c1 = np.divide(x1, x2, where=x2 != 0)
+        self.current_angles = np.arccos(np.clip(c1,-1.0,1.0))
 
-        # self.previous_traj_angles = self.current_traj_angles.copy()
-        normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
-        # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
-        # self.current_traj_angles = np.arccos(np.divide(x3, x2, where=x2 != 0))
-
-        self.previous_vel_angles = self.current_vel_angles.copy()
-        lin_vel = self.attitudes[: ,2]
-        normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
-        x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
-        self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
+        #
+        # # self.previous_traj_angles = self.current_traj_angles.copy()
+        # normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
+        # # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
+        # # self.current_traj_angles = np.arccos(np.divide(x3, x2, where=x2 != 0))
+        #
+        # self.previous_vel_angles = self.current_vel_angles.copy()
+        # lin_vel = self.attitudes[: ,2]
+        # normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
+        # x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
+        # self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
 
 
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
         self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
 
+        #seems wrong
+        self.heading_towards_target = np.logical_and(
+                            self.current_vel_angles < (np.pi / 2.0),
+                            (np.sum(self.separation *self.linear_velocities, axis = -1) > 0)
+        )
 
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
@@ -239,6 +257,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     *lin_pos,
                     *aux_state,
                     *self.past_actions[agent_id],
+                    self.current_magnitude[agent_id],
 
                     *ally_lin_vel,
                     *ally_lin_pos,
@@ -284,7 +303,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
             # reward for closing the distance
             rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 1.0,
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5.0,
                 a_min=-10.0,
                 a_max=None,
             ) * (
@@ -309,9 +328,10 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
             # reward for maintaning linear velocities.
             rew_speed_magnitude =(
-                    (self.current_magnitude[agent_id])
-                    * self.chasing[agent_id][target_id]
+                    (self.current_magnitude[agent_id])**2
+                    #* self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
+                    * 5.0
             )
 
 
@@ -322,14 +342,47 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     + rew_speed_magnitude
             )
 
-        step_data = {
-            "agent_id": agent_id,
-            "elapsed_time": self.aviary.elapsed_time,
-            "rew_closing_distance": rew_closing_distance,
-            "rew_engaging_enemy": rew_engaging_enemy,
-            "rew_speed_magnitude": rew_speed_magnitude,
-        }
-        self.rewards_data.append(step_data)
+        # step_data = {
+        #     "agent_id": agent_id,
+        #     "elapsed_time": self.aviary.elapsed_time,
+        #     "rew_closing_distance": rew_closing_distance,
+        #     "rew_engaging_enemy": rew_engaging_enemy,
+        #     "rew_speed_magnitude": rew_speed_magnitude,
+        #     "vel_angles": self.current_vel_angles[agent_id][target_id],
+        #     "approaching": int(self.approaching[agent_id][target_id]),
+        #     "chasing": int(self.chasing[agent_id][target_id]),
+        #     "heading_towards_target": int(self.heading_towards_target[agent_id][target_id]),
+        # }
+        #self.rewards_data.append(step_data)
+
+
+    def compute_engagements(self):
+
+        for ag in self.agents:
+            ag_id = self.agent_name_mapping[ag]
+
+            if self.manager.downed_lm[ag_id]:
+                self.rew[ag] -= 10
+                self.term[ag] |= True
+                self.trun[ag] |= True
+                self.inf[ag]['downed'] = True
+
+            if self.term[ag] or self.trun[ag]:
+                self.disarm_drone(ag_id)
+                collisions_ids = self.get_collision_ids(ag_id)
+
+                for id in collisions_ids:
+                    # if self.drone_classes[id] == 'lw':
+                    self.disarm_drone(id)
+                    if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
+                        self.targets.remove(self.drone_id_mapping[id])
+                    if self.drone_classes[id] == 'lw':
+                        pass
+
+
+
+
+
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -411,7 +464,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
 
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = ["agent_id", "elapsed_time", "rew_closing_distance", "rew_engaging_enemy",
-                          "rew_speed_magnitude"]
+                          "rew_speed_magnitude", "vel_angles", "approaching", "chasing", "heading_towards_target"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
             # Write the header
@@ -446,3 +499,31 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         plt.grid(True)
         plt.show()
 
+    def plot_agent_rewards(self, filename, agent_id):
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('TkAgg')
+
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(filename)
+
+        # Filter data for the specified agent
+        agent_data = df[df['agent_id'] == agent_id]
+
+        # Plotting
+        plt.figure(figsize=(12, 8))
+
+        #plt.plot(agent_data['elapsed_time'], agent_data['rew_closing_distance'], label='Closing Distance')
+        #plt.plot(agent_data['elapsed_time'], agent_data['rew_engaging_enemy'], label='Engaging Enemy')
+        #plt.plot(agent_data['elapsed_time'], agent_data['rew_speed_magnitude'], label='Speed Magnitude')
+        plt.plot(agent_data['elapsed_time'], agent_data['vel_angles'], label='vel_angles')
+        plt.plot(agent_data['elapsed_time'], agent_data['chasing'], label='chasing')
+        plt.plot(agent_data['elapsed_time'], agent_data['heading_towards_target'], label='heading_towards_target')
+
+        plt.xlabel('Elapsed Time')
+        plt.ylabel('Rewards')
+        plt.title(f'Rewards Over Time for Agent {agent_id}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()

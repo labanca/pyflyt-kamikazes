@@ -1,0 +1,76 @@
+train_desc="testing only with speed magnitude, now without self.chasing. 10 lm to see if trains better.\n\n            self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]\n            self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15\n            self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0\n            \n            # reward for maintaning linear velocities.\n            rew_speed_magitude =(\n                    (self.current_magnitude[agent_id])\n\n                    * self.approaching[agent_id][target_id]\n            )\n\n            self.rewards[agent_id] += (\n\n                    + rew_speed_magitude\n            )\n"
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-27 20:44:11.577471
+elapsed_time=0:14:40.493010
+model.num_timesteps=1228800
+device=device(type='cuda')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[256, 256, 256]
+num_cpus=12
+num_vec_envs=12
+model.n_envs=120
+model.n_steps=2048
+model.n_epochs=10
+model.batch_size=512
+random_respawn=True
+spawn_settings={'lw_center_bounds': 5.0, 'lm_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 10}
+completion_datetime=2023-12-27 20:58:52.070481
+model.action_space=Box(-10.0, 10.0, (4,), float64)
+model.observation_space=Box(-inf, inf, (40,), float64)
+env_kwargs={'start_pos': array([[-11.27704963,   3.64003328,  15.81938721],
+       [ -2.89347113,  17.01810732,   3.4887026 ],
+       [ -5.27765782,   1.68302179,   7.41334462],
+       [  3.55665821,   8.04651753,  13.92882556],
+       [ -3.57473823,   0.35208707,   1.17417019],
+       [ -9.43030925,  12.98944493,   4.26515479],
+       [ -3.14757535,  18.89590825,   5.37849305],
+       [ -5.91660042,   0.87830543,   6.14912175],
+       [  6.81831556,   5.76415845,  12.71144368],
+       [  7.41655704,  18.46859672,   8.13684186],
+       [ -3.01286008,  -3.03938641,   1.22411605]]), 'start_orn': array([[ 0.99424221,  0.77386582,  3.3374994 ],
+       [-0.10322104, -0.84619984, -2.36743232],
+       [ 0.74509385, -0.45275253, -1.66840217],
+       [-0.81839359, -0.3152851 , -3.89273483],
+       [ 0.54692304,  0.93757777, -2.36561523],
+       [ 0.99330089, -0.42589105, -0.797508  ],
+       [ 0.99274966,  0.17349094,  1.73976376],
+       [ 0.43427032,  0.58619129,  2.29320895],
+       [-0.33356018, -0.50438426,  4.56756857],
+       [ 0.40467618,  0.5544856 , -5.40607756],
+       [ 0.        ,  0.        ,  0.        ]]), 'formation_center': [-4.012860078187628, -3.0393864110037825, 1.2241160502032882], 'flight_dome_size': 40.0, 'spawn_settings': {'lw_center_bounds': 5.0, 'lm_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 10}, 'num_lm': 10}
+model.policy_kwargs={'net_arch': {'pi': [256, 256, 256], 'vf': [256, 256, 256]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=256, out_features=4, bias=True)
+  (value_net): Linear(in_features=256, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

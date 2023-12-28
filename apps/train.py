@@ -44,7 +44,7 @@ def train_butterfly_supersuit(
 
     device = get_device('cuda')
     batch_size = 512 # 512 davi
-    lr = 1e-4
+    lr = 1e-3
     nn_t = [256, 256, 256]
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
@@ -175,33 +175,32 @@ seed=None
 
 spawn_settings = dict(
     lw_center_bounds=5.0,
-    lm_center_bounds=5,
+    lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
+    lm_spawn_radius=5,
     min_z=1.0,
     seed=None,
-    num_lw=5,
-    num_lm=10,
+    num_lw=3,
+    num_lm=6,
 )
-
 
 if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
-        'formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
-                                      spawn_settings[
-                                          'lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
+                                      spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
     env_kwargs['seed'] = seed
     env_kwargs['spawn_settings'] = spawn_settings
+    env_kwargs['num_lm'] = spawn_settings['num_lm']
 
     #seed = 42
-    train_desc = """LW no fight back.
-            # reward for closing the distance
+    train_desc = """three rewards, more closing distance and magnitude.
+
+             # reward for closing the distance
             rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 1.0,
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5.0,
                 a_min=-10.0,
                 a_max=None,
             ) * (
@@ -216,22 +215,33 @@ if __name__ == "__main__":
                     * 1.0
                 )
 
-            # reward for maintaning linear velocities.
-            rew_speed_magitude =(
-                    (self.current_magnitude[agent_id])
-                    * self.chasing[agent_id][target_id]
+            # # reward for progressing to engagement
+            rew_near_engagement = (
+                    (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id])
+                    * 10.0
+                    * self.in_range[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
             )
+
+            # reward for maintaning linear velocities.
+            rew_speed_magnitude =(
+                    (self.current_magnitude[agent_id])**2
+                    #* self.chasing[agent_id][target_id]
+                    * self.approaching[agent_id][target_id]
+                    * 5.0
+            )
+
+
 
             self.rewards[agent_id] += (
                     rew_closing_distance
                     + rew_engaging_enemy
-                    + rew_speed_magitude
+                    + rew_speed_magnitude
             )
 """
 
     #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=20_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=30_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
