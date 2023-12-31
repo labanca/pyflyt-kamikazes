@@ -61,7 +61,7 @@ class ShootThreatState(State):
     def execute(self):
         if self.drone_fsm.gun_loaded:
             if self.drone_fsm.shoot_target():
-                #print(f'Drone {self.drone_fsm.id} hit threat {self.drone_fsm.current_threat_id}!')
+
                 self.drone_fsm.change_state('GoToFormationState')
 
         elif not self.drone_fsm.reloading:
@@ -103,7 +103,7 @@ class LWManager:
         self.aviary = self.env.aviary
         self.threat_radius = threat_radius
         self.formation_radius = formation_radius
-        self.max_velocity = np.linalg.norm(np.linalg.norm([6, 6, 6]))
+        self.max_velocity = np.linalg.norm(np.linalg.norm([4, 4, 4]))
         self.num_drones = self.env.num_drones
         self.num_lw = self.env.num_lw
         self.num_lm = self.env.num_lm
@@ -120,6 +120,8 @@ class LWManager:
                             threat_radius=threat_radius,
                             shoot_range=shoot_range,
                             manager=self) for k, v in self.env.armed_uav_types.items() if v == 'lw']
+
+        self.env.squad_id_mapping = {self.squad[i].id: i for i,v in list(enumerate(self.squad))}
 
     def update(self, stand_still = False):
 
@@ -308,15 +310,14 @@ class LWFSM:
 
                 # Determine if the shot hits
                 hit = np.random.random() < hit_probability
+                self.gun_loaded = False
 
                 if hit:
-
+                    #print(f'Drone {self.id} hit threat {self.current_threat_id}!')
                     # Disarm the target drone if hit
-                    #self.manager.env.disarm_drone(self.current_threat_id)
                     self.manager.downed_lm[self.current_threat_id] +=1
 
                     self.last_shot_time = self.manager.aviary.elapsed_time  # Update last shot time
-                    self.gun_loaded = False
 
                     if self.current_threat_id in self.manager.env.armed_uav_types.keys():
                         self.manager.env.armed_uav_types.pop(self.current_threat_id)

@@ -45,6 +45,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
     metadata = {
         "render_modes": ["human"],
         "name": "ma_quadx_hover",
+
     }
 
     def __init__(
@@ -64,10 +65,12 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         render_mode: None | str = None,
         uav_mapping: np.array = np.array(['lm', 'lm', 'lm', 'lm']),
         seed : int = None,
-        num_lm: int = None,
+        num_lm: int = 1,
+        num_lw: int = 1,
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
+        black_death: bool = False,
     ):
         """__init__.
 
@@ -92,7 +95,9 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             spawn_settings=spawn_settings,
             seed=seed,
             num_lm=num_lm,
-            formation_center=formation_center
+            num_lw=num_lw,
+            formation_center=formation_center,
+            black_death=black_death
 
         )
 
@@ -104,7 +109,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 20,),
+            shape=(self.combined_space.shape[0] + 21,),
             dtype=np.float64,
         )
 
@@ -234,6 +239,13 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # target_attitude = self.aviary.state(target_id)
         target_attitude = self.compute_attitude_by_id(target_id)
         ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quaternion_target = target_attitude
+        try:
+            target_last_shot_time = self.manager.squad[self.squad_id_mapping[target_id]].last_shot_time
+
+        except:
+            target_last_shot_time = -1
+
+
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -266,6 +278,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     *np.array(quaternion_target),
                     *lin_vel_target,
                     *lin_pos_target,
+                    target_last_shot_time,
                 ]
             )
         else:
@@ -294,15 +307,18 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         """_compute_engagement_rewards."""
         # reset rewards
         self.rewards[agent_id] *= 0.0
+        ag = self.drone_id_mapping[agent_id]
 
         target_id = self.find_nearest_lw(agent_id)
+        self.current_target_id[agent_id] = target_id
+
         # sparse reward computation
         if not self.sparse_reward:
 
             self.approaching = self.current_distance < self.previous_distance
 
             # reward for closing the distance
-            rew_closing_distance = np.clip(
+            self.rew_closing_distance = np.clip(
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5.0,
                 a_min=-10.0,
                 a_max=None,
@@ -311,7 +327,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                 )
 
             # reward for engaging the enemy
-            rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
+            self.rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
                                            where=self.current_vel_angles[agent_id][target_id] != 0) * (
                     self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
@@ -319,41 +335,28 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                 )
 
             # # reward for progressing to engagement
-            rew_near_engagement = (
-                    (self.previous_vel_angles[agent_id][target_id] - self.current_vel_angles[agent_id][target_id])
-                    * 10.0
+            self.rew_near_engagement = (
+                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
+                    * 100.0
                     * self.in_range[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
+                    * self.chasing[agent_id][target_id]
             )
 
             # reward for maintaning linear velocities.
-            rew_speed_magnitude =(
+            self.rew_speed_magnitude =(
                     (self.current_magnitude[agent_id])**2
                     #* self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
-                    * 5.0
+                    * 1.0
             )
-
-
 
             self.rewards[agent_id] += (
-                    rew_closing_distance
-                    + rew_engaging_enemy
-                    + rew_speed_magnitude
+                    self.rew_closing_distance
+                    + self.rew_engaging_enemy
+                    + self.rew_speed_magnitude
+                    + self.rew_near_engagement
             )
-
-        # step_data = {
-        #     "agent_id": agent_id,
-        #     "elapsed_time": self.aviary.elapsed_time,
-        #     "rew_closing_distance": rew_closing_distance,
-        #     "rew_engaging_enemy": rew_engaging_enemy,
-        #     "rew_speed_magnitude": rew_speed_magnitude,
-        #     "vel_angles": self.current_vel_angles[agent_id][target_id],
-        #     "approaching": int(self.approaching[agent_id][target_id]),
-        #     "chasing": int(self.chasing[agent_id][target_id]),
-        #     "heading_towards_target": int(self.heading_towards_target[agent_id][target_id]),
-        # }
-        #self.rewards_data.append(step_data)
 
 
     def compute_engagements(self):
@@ -422,34 +425,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         return rz @ ry @ rx, forward_vector
 
 
-    def save_runtim_data_by_id(self, agent_id, target_id, **rew_kwargs):
-
-        ang_vel_a, ang_pos_a, lin_vel_a, lin_pos_a, quaternion_a = self.compute_attitude_by_id(agent_id)
-        ang_vel_t, ang_pos_t, lin_vel_t, lin_pos_t, quaternion_t = self.compute_attitude_by_id(target_id)
-        self.rew_log.append([
-            self.aviary.elapsed_time,
-             rew_kwargs['rew_closing_distance'],
-             rew_kwargs['rew_progress_eng'],
-             rew_kwargs['rew_engaging_enemy'],
-             rew_kwargs['rew_last_distance'],
-             ang_vel_a,
-             ang_pos_a,
-             lin_vel_a,
-             lin_pos_a[0],
-             lin_pos_a[1],
-             lin_pos_a[2],
-             quaternion_a,
-             ang_vel_t,
-             ang_pos_t,
-             lin_vel_t,
-             lin_pos_t[0],
-             lin_pos_t[1],
-             lin_pos_t[2],
-             quaternion_t,
-             self.current_distance[agent_id][target_id],
-             self.current_angles[agent_id][target_id],
-             ])
-
     def print_rewards(self, agent_id, **kargs):
         for k,v in kargs.items():
             print(f'{agent_id} {k} = {v}')
@@ -463,8 +438,12 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         import csv
 
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ["agent_id", "elapsed_time", "rew_closing_distance", "rew_engaging_enemy",
-                          "rew_speed_magnitude", "vel_angles", "approaching", "chasing", "heading_towards_target"]
+            fieldnames = ["agent_id", "elapsed_time",
+                          "rew_closing_distance", "rew_engaging_enemy", "rew_speed_magnitude", "rew_near_engagement", "acc_rewards",
+                          "vel_angles", "approaching", "chasing", "in_range", "current_term",
+                          "info[downed]", "info[exploded_target]", "info[exploded_ally]",  "info[crashes]", "info[ally_collision]",
+                            "info[mission_complete]", "info[out_of_bounds]", "info[timeover]"
+                          ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
             # Write the header
@@ -514,12 +493,75 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # Plotting
         plt.figure(figsize=(12, 8))
 
-        #plt.plot(agent_data['elapsed_time'], agent_data['rew_closing_distance'], label='Closing Distance')
-        #plt.plot(agent_data['elapsed_time'], agent_data['rew_engaging_enemy'], label='Engaging Enemy')
-        #plt.plot(agent_data['elapsed_time'], agent_data['rew_speed_magnitude'], label='Speed Magnitude')
+        plt.plot(agent_data['elapsed_time'], agent_data['rew_closing_distance'], label='Closing Distance')
+        plt.plot(agent_data['elapsed_time'], agent_data['rew_engaging_enemy'], label='Engaging Enemy')
+        plt.plot(agent_data['elapsed_time'], agent_data['rew_speed_magnitude'], label='Speed Magnitude')
+        plt.plot(agent_data['elapsed_time'], agent_data['rew_near_engagement'], label='Near Engagement')
         plt.plot(agent_data['elapsed_time'], agent_data['vel_angles'], label='vel_angles')
         plt.plot(agent_data['elapsed_time'], agent_data['chasing'], label='chasing')
-        plt.plot(agent_data['elapsed_time'], agent_data['heading_towards_target'], label='heading_towards_target')
+
+
+        plt.xlabel('Elapsed Time')
+        plt.ylabel('Rewards')
+        plt.title(f'Rewards Over Time for Agent {agent_id}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def plot_agent_infos(self, filename, agent_id):
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('TkAgg')
+
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(filename)
+
+        # Filter data for the specified agent
+        agent_data = df[df['agent_id'] == agent_id]
+
+        # Plotting
+        plt.figure(figsize=(12, 8))
+
+        plt.plot(agent_data['elapsed_time'], agent_data['info[out_of_bounds]'], label='out_of_bounds')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[crashes]'], label='crashes')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[timeover]'], label='timeover')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[exploded_target]'], label='exploded_target')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[exploded_ally]'], label='exploded_ally')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[mission_complete]'], label='mission_complete')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[ally_collision]'], label='ally_collision')
+        plt.plot(agent_data['elapsed_time'], agent_data['info[downed]'], label='downed')
+
+
+
+        plt.xlabel('Elapsed Time')
+        plt.ylabel('Rewards')
+        plt.title(f'Rewards Over Time for Agent {agent_id}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def plot_agent_infos2(self, filename, agent_id):
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('TkAgg')
+
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(filename)
+
+        # Filter data for the specified agent
+        agent_data = df[df['agent_id'] == agent_id]
+
+        # Plotting
+        plt.figure(figsize=(12, 8))
+
+        # Extract unique categories
+        categories = [col.replace('info[', '').replace(']', '') for col in agent_data.columns if 'info[' in col]
+
+        # Plot each category as a filled area
+        for category in categories:
+            plt.fill_between(agent_data['elapsed_time'], 0, agent_data[f'info[{category}]'], label=category, alpha=0.7)
 
         plt.xlabel('Elapsed Time')
         plt.ylabel('Rewards')

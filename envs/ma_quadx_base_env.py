@@ -17,7 +17,11 @@ from modules.lwsfm import LWManager
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
-
+    metadata = {
+        "render_modes": ["human"],
+        "name": "ma_quadx_hover",
+        "black_death": True
+    }
     def __init__(
         self,
         spawn_settings: dict(),
@@ -34,9 +38,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         render_mode: None | str = None,
         seed: int = None,
         num_lm: int = 1,
+        num_lw: int = 1,
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
+        black_death: bool = False
     ):
         """__init__.
 
@@ -123,13 +129,14 @@ class MAQuadXBaseEnv(ParallelEnv):
             start_pos.shape == start_orn.shape
         ), f"Expected `start_pos` to be of shape [num_agents, 3], got {start_pos.shape}."
 
+        #self.black_death = black_death
         self.start_pos = start_pos
         self.start_orn = start_orn
         self.spawn_settings = spawn_settings
         self.seed = seed
         self.num_drones = len(start_pos)
         self.num_lm = num_lm #self.spawn_settings['num_lm']
-        self.num_lw = self.num_drones - num_lm #self.spawn_settings['num_lw']
+        self.num_lw = num_lw #self.spawn_settings['num_lw']
         self.formation_center = formation_center
         self.lethal_distance = 1
         self.lethal_angle = 0.1
@@ -262,9 +269,25 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.aviary.disconnect()
         self.step_count = 0
 
-        #update lists to reset death agents
+        np_random = np.random.RandomState(seed=seed)
+
+        if self.spawn_settings is not None:
+            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
+
         self.agents = self.possible_agents[:]
         self.targets = self.possible_targets[:]
+
+        self.current_term = {k: False for k in self.agents}
+        self.current_trun = {k: False for k in self.agents}
+        self.current_acc_rew = {k: 0.0 for k in self.agents}
+        self.current_inf = {k: dict() for k in self.agents}
+        self.current_obs = {k: [] for k in self.agents}
+        self.rew_closing_distance = 0.0
+        self.rew_engaging_enemy = 0.0
+        self.rew_speed_magnitude = 0.0
+        self.rew_near_engagement = 0.0
+        self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
+
 
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
@@ -301,8 +324,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
 
-        if self.spawn_settings is not None:
-            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
+        self.squad_id_mapping = {}
 
         # rebuild the environment
         self.aviary = Aviary(
@@ -439,12 +461,12 @@ class MAQuadXBaseEnv(ParallelEnv):
             term |= True
             #trunc |= True
 
-        # #destroy other
-        # if 'lm' in explosions:
-        #     reward -= 1000.0
-        #     info["friendly_fire"] = True
-        #     term |= True
-        #     trunc |= True
+        #destroy other lm
+        if 'lm' in explosions:
+            reward -= 100.0
+            info["exploded_ally"] = True
+            #term |= True
+            #trunc |= True
 
         return term, trunc, reward, info
 
@@ -532,12 +554,12 @@ class MAQuadXBaseEnv(ParallelEnv):
             # compute observations
             observations[ag] = self.compute_observation_by_id(ag_id)
 
-            # self.term = terminations
-            # self.trun = truncations
-            # self.rew = rewards
-            # self.inf = infos
-
-
+            self.current_term[ag] = term
+            self.current_trun[ag] = trunc
+            self.current_acc_rew[ag] += rew
+            self.current_inf[ag] = {**infos[ag], **info}
+            self.current_obs[ag] = observations[ag]
+            self.save_step_data(ag)
 
             if self.manager.downed_lm[ag_id]:
                 rewards[ag] -= 10
@@ -548,15 +570,31 @@ class MAQuadXBaseEnv(ParallelEnv):
             if terminations[ag] or truncations[ag]:
                 self.disarm_drone(ag_id)
                 collisions_ids = self.get_collision_ids(ag_id)
+                lw_down, lm_down = [],[]
 
                 for id in collisions_ids:
                     # if self.drone_classes[id] == 'lw':
+
+
                     self.disarm_drone(id)
+
                     if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
                         self.targets.remove(self.drone_id_mapping[id])
+
                     if self.drone_classes[id] == 'lw':
                         pass
 
+
+
+
+
+                #lw_down = [i for i in collisions_ids if self.drone_classes[i] == 'lw']
+                #lm_down = [i for i in collisions_ids if self.drone_classes[i] == 'lm']
+
+                #if any(lw_down):
+                    #print(f'Kamizaze {ag} destroyed lw {lw_down}!')
+                #elif any(lm_down):
+                    #print(f'Kamizaze {ag} friendly-fired lm {lm_down}!')
         # increment step count and cull dead agents for the next round
         self.step_count += 1
         self.agents = [
@@ -671,15 +709,15 @@ class MAQuadXBaseEnv(ParallelEnv):
                                lm_center_bounds=5, lm_spawn_radius=10, num_lm=3,):
 
         np_random = np.random.RandomState(seed=seed)
-        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_spawn_radius),
-                               np.random.uniform(-lw_center_bounds, lw_spawn_radius),
+        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_center_bounds),
+                               np.random.uniform(-lw_center_bounds, lw_center_bounds),
                                np.random.uniform(min_z, lw_spawn_radius + min_z)]
 
         start_pos_lw = LWManager.generate_formation_pos(lw_formation_center, num_lw, lw_spawn_radius)
         start_orn_lw = np.zeros_like(start_pos_lw)
 
-        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_spawn_radius),
-                               np.random.uniform(-lm_center_bounds, lm_spawn_radius),
+        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_center_bounds),
+                               np.random.uniform(-lm_center_bounds, lm_center_bounds),
                                np.random.uniform(min_z, lm_spawn_radius + min_z)]
 
         start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_spawn_radius,
@@ -983,18 +1021,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
         self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
 
-    def save_data(self):
-        pass
-        #  if 'lm' not in self.uav_mapping[[self.agent_name_mapping[agent] for agent in self.agents]]:
-        # if all(terminations):
-        #      #truncations = {key: True for key in truncations}
-        #     truncations[ag] = True
-        #
-        # if all(terminations.values()) or all(truncations.values()):
-        #     df = pd.DataFrame(self.rew_log)
-        #
-        #     df.to_csv('rew_log.csv', float_format='%.4f', decimal='.', sep=';', index=False, header=False )
-
 
     def decode_observation(self, obs) -> dict:
 
@@ -1004,12 +1030,13 @@ class MAQuadXBaseEnv(ParallelEnv):
         lin_pos = obs[10:13]
         aux_state = obs[13:17]
         past_actions = obs[17:21]
-        ally_lin_vel = obs[21:24]
-        ally_lin_pos = obs[24:27]
-        ang_vel_target = obs[27:30]
-        quaternion_target = obs[30:34]
-        lin_vel_target = obs[34:37]
-        lin_pos_target = obs[37:40]
+        vel_magnitude = obs[22]
+        ally_lin_vel = obs[23:26]
+        ally_lin_pos = obs[26:29]
+        ang_vel_target = obs[29:32]
+        quaternion_target = obs[32:36]
+        lin_vel_target = obs[36:39]
+        lin_pos_target = obs[39:41]
 
         return {
             "ang_vel": ang_vel,
@@ -1018,6 +1045,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             "lin_pos": lin_pos,
             "aux_state": aux_state,
             "past_actions": past_actions,
+            'vel_magnitude': 'vel_magnitude',
             "ally_lin_vel": ally_lin_vel,
             "ally_lin_pos": ally_lin_pos,
             "ang_vel_target": ang_vel_target,
@@ -1052,3 +1080,32 @@ class MAQuadXBaseEnv(ParallelEnv):
         print(f"quaternion_target: {quaternion_target}")
         print(f"lin_vel_target: {lin_vel_target}")
         print(f"lin_pos_target: {lin_pos_target}")
+
+
+    def save_step_data(self, agent):
+        agent_id = self.agent_name_mapping[agent]
+        target_id = self.current_target_id[agent_id]
+        step_data = {
+            "agent_id": agent_id,
+            "elapsed_time": self.aviary.elapsed_time,
+            "rew_closing_distance": self.rew_closing_distance,
+            "rew_engaging_enemy": self.rew_engaging_enemy,
+            "rew_speed_magnitude": self.rew_speed_magnitude,
+            "rew_near_engagement": self.rew_near_engagement,
+            "acc_rewards": self.current_acc_rew[agent],
+            "vel_angles": self.current_vel_angles[agent_id][target_id],
+            "approaching": int(self.approaching[agent_id][target_id]),
+            "chasing": int(self.chasing[agent_id][target_id]),
+            "in_range": self.in_range[agent_id][target_id],
+            "current_term": int(self.current_term[agent]),
+            "info[downed]": int(self.current_inf[agent].get('downed', False)),
+            "info[exploded_target]": int(self.current_inf[agent].get('exploded_target', False)),
+            "info[exploded_ally]": int(self.current_inf[agent].get('exploded_ally', False)),
+            "info[crashes]": int(self.current_inf[agent].get('crashes', False)),
+            "info[ally_collision]": int(self.current_inf[agent].get('ally_collision', False)),
+            "info[mission_complete]": int(self.current_inf[agent].get('mission_complete', False)),
+            "info[out_of_bounds]": int(self.current_inf[agent].get('out_of_bounds', False)),
+            "info[timeover]": int(self.current_inf[agent].get('timeover', False)),
+
+        }
+        self.rewards_data.append(step_data)

@@ -9,12 +9,9 @@ from __future__ import annotations
 import glob
 import os
 import time
-import numpy as np
-import torch
 from datetime import datetime
 
 import supersuit as ss
-import torch
 from stable_baselines3 import PPO
 from stable_baselines3.ppo import MlpPolicy
 from stable_baselines3.common.utils import get_device
@@ -25,23 +22,19 @@ from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
 
 
 def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', **env_kwargs
+    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', resume = False, **env_kwargs
 ):
     # Train a single model to play as each agent in a cooperative Parallel environment
     env = env_fn(**env_kwargs)
 
     env.reset(seed=seed)
 
-    print(f"Starting training on {str(env.metadata['name'])}.")
-
-    env = ss.black_death_v3(env,)
-    env = ss.pettingzoo_env_to_vec_env_v1(env )
-
+    env = ss.black_death_v3(env)
+    env = ss.pettingzoo_env_to_vec_env_v1(env,)
 
     num_vec_envs = 12 #8
     num_cpus = 12 #(os.cpu_count() or 1)
-    env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
-
+    env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
     device = get_device('cuda')
     batch_size = 512 # 512 davi
@@ -51,7 +44,25 @@ def train_butterfly_supersuit(
         net_arch=dict(pi=nn_t, vf=nn_t)
     )
 
-    model = PPO(
+    try:
+        latest_policy = max(
+            glob.glob(f"resumes/{env.metadata['name']}*.zip"), key=os.path.getctime
+        )
+    except:
+        latest_policy = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
+
+    if resume:
+        model_name = latest_policy
+        model_path = f"resumes/{model_name.split('_')[-1]}_res_{time.strftime('%Y%m%d-%H%M%S')}"
+        #model = PPO.load(f"models/{model_name}.zip", env=env)
+        model = PPO.load(f"resumes/{model_name}.zip", env=env)
+        print(f"Starting resume training on {model_name}.")
+        print(f'{model.num_timesteps}')
+        model.learn(total_timesteps=steps, reset_num_timesteps=False, )
+        model.save(model_path)
+
+    else:
+        model = PPO(
         MlpPolicy,
         env,
         verbose=1,
@@ -59,17 +70,17 @@ def train_butterfly_supersuit(
         batch_size=batch_size,
         policy_kwargs=policy_kwargs,
         device=device,
-    )
-
-    model.learn(total_timesteps=steps)
-    model_name = f"models/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
-    model.save(model_name)
+        )
+        model_name = f"models/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
+        print(f"Starting training on {str(env.metadata['name'])}.")
+        model.learn(total_timesteps=steps)
+        model.save(model_name)
 
     print("Model has been saved.")
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
 
-    with open(f'{model_name}.txt', 'w') as file:
+    with open(f'resumes/{model_name}.txt', 'w') as file:
         # Write train params to file
         start_datetime = datetime.fromtimestamp(model.start_time / 1e9)
         current_time = datetime.now()
@@ -196,9 +207,11 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
+    env_kwargs['black_death'] = True
 
     #seed = 42
-    train_desc = """training from zero with FSM on and self.gunloaded in the observation. current magnitude**2 * 1.0 (was* 5.0)
+    train_desc = """resume training for ma_quadx_hover_20231230-221538_res_20231230-223741.zip, same but 2M more timesteps.
+
 
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
@@ -219,8 +232,8 @@ if __name__ == "__main__":
 
             # # reward for progressing to engagement
             self.rew_near_engagement = (
-                    (self.current_magnitude[agent_id]**2)
-                    * 10.0
+                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
+                    * 100.0
                     * self.in_range[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
                     * self.chasing[agent_id][target_id]
@@ -238,11 +251,13 @@ if __name__ == "__main__":
                     self.rew_closing_distance
                     + self.rew_engaging_enemy
                     + self.rew_speed_magnitude
+                    + self.rew_near_engagement
             )
 """
 
+    resume_train = True
     #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, resume=resume_train, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
