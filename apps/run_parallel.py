@@ -16,7 +16,7 @@ spawn_settings = dict(
     min_z=1.0,
     seed=None,
     num_lw=1,
-    num_lm=2,
+    num_lm=10,
 )
 env_kwargs = {}
 env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
@@ -31,8 +31,8 @@ env = MAQuadXHoverEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}
-counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_ally' : 0,
-            'mission_complete': 0, 'ally_collision': 0, 'downed': 0,  }
+counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
+            'survived': 0, 'ally_collision': 0, 'downed': 0}
 first_time = True
 num_games = 1
 
@@ -47,15 +47,13 @@ while env.agents:
     if first_time == True:
         first_time = False
 
-    elif set(terminations.values()) != set(last_term.values()) and (len(terminations.values()) == len(last_term.values())):
+    elif set(terminations.values()) != set(last_term.values()):
         print(f"| An agent terminated |")
         print(f'{terminations=}')
         print(f'{truncations=}')
         print(f'{infos=}\n')
 
     last_term = terminations
-
-
 
     if any(terminations.values()) or any(truncations.values()):
 
@@ -67,12 +65,13 @@ while env.agents:
     if all(terminations.values()) or all(truncations.values()):
         print(f'********* EPISODE END **********\n')
         print(f'{rewards=}\n')
-        print(f'{terminations=} {truncations=}\n')
+        print(f'{terminations=}')
+        print(f'{truncations=}\n')
         print(f'{infos=}\n\n\n')
         #time.sleep(5)
-        env.save_rewards_data('reward_data.csv')
+        env.write_step_data('reward_data.csv')
         env.plot_agent_rewards('reward_data.csv', 0)
-        #env.plot_agent_infos2('reward_data.csv', 0)
+        env.plot_agent_infos2('reward_data.csv', 0)
 
 
         #observations, infos = env.reset(seed=seed)

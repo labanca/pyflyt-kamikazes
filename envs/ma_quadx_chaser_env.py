@@ -295,11 +295,15 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         #self._compute_agent_states()
 
         # don't recompute if we've already done it
-        #if self.last_rew_time != self.aviary.elapsed_time and self.last_agent_id == agent_id:
-        self.last_rew_time = self.aviary.elapsed_time
+
         self._compute_engagement_rewards(agent_id)
 
         reward += self.rewards[agent_id]
+
+        self.compute_collisions(agent_id)
+
+        if term:
+            self.disarm_drone(agent_id)
 
         return term, trunc, reward, info
 
@@ -431,7 +435,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         print(f'{self.current_vel_angles[agent_id][1]=}')
         print(f'------------------------------------------------------------')
 
-    def save_rewards_data(self, filename):
+    def write_step_data(self, filename):
         # Save the rewards data to a file
         import csv
 

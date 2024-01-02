@@ -349,7 +349,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self._compute_agent_states()
 
-        self.manager = LWManager(env=self,
+        self.lw_manager = LWManager(env=self,
                                  formation_radius=1.0,
                                  threat_radius=4.0,
                                  shoot_range=2.0,
@@ -432,32 +432,40 @@ class MAQuadXBaseEnv(ParallelEnv):
             reward -= 100.0
             info["crashes"] = True
             term |= True
-            #trunc |= True
 
         # exceed flight dome
         if np.linalg.norm(self.aviary.state(agent_id)[-1]) > self.flight_dome_size:
             reward -= 100.0
             info["out_of_bounds"] = True
             term |= True
-            #trunc |= True
 
         # collide with other kamikaze
         colissions = self.get_friendlyfire_type_collision(agent_id)
         if 'lm' in colissions:
-            reward -= 10.0
+            reward -= 100.0
             info["ally_collision"] = True
             term |= True
-            #trunc |= True
 
-        # destroy with any loyal wingmen
-        midrange_collisions = self.get_type_collision(agent_id)
-        if 'lw' in midrange_collisions:
-            reward += 10000.0
+        # Shoot down by a loyal wingman
+        if self.lw_manager.downed_lm[agent_id]:
+            reward -= 100
+            term |= True
+            info['downed'] = True
+
+        # destroy any loyal wingman
+        explosion_mapping = self.get_explosion_mapping(agent_id)
+        if 'lw' in explosion_mapping.values():
+            reward += 1000.0
             info["exploded_target"] = True
             term |= True
-            #trunc |= True
 
-        # # being near of other lm
+        if self.get_collateral_explosions(agent_id):
+            reward += 0
+            if not info.get("exploded_target", False): # avoid misscounting when exploded the same target
+                info["exploded_by_ally"] = True
+            term |= True
+
+        # # being near of other lm without
         # if 'lm' in midrange_collisions:
         #     reward -= 1.0
         #     #info["exploded_ally"] = True
@@ -525,147 +533,72 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.aviary.step()
             self._compute_agent_states()
             self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
-            self.manager.update(stand_still=False)
+            self.lw_manager.update(stand_still=False)
 
             # Debug, draw vel forward and trajectory vectors
             #self.draw_debug_vectors()
 
-            # Avoid losing detect a collision with aviary steps without a RL step. Do not consider ground collision
-            if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
-                break
+            # # Avoid losing detect a collision with aviary steps without a RL step. Do not consider ground collision
+            # if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
+            #     break
+            #
+            # if any([self.collision_matrix[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
+            #     break
 
-            if any([self.collision_matrix[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
-                break
+            # update reward, term, trunc, for each agent
+            for ag in self.agents:
+                ag_id = self.agent_name_mapping[ag]
 
+                # compute term trunc reward
+                term, trunc, rew, info = self.compute_term_trunc_reward_info_by_id(ag_id)
+                #self.compute_collisions(ag)
 
+                terminations[ag] |= term
+                truncations[ag] |= trunc
+                rewards[ag] += rew
+                infos[ag] = {**infos[ag], **info}
 
-        # update reward, term, trunc, for each agent
-        for ag in self.agents:
-            ag_id = self.agent_name_mapping[ag]
+                # compute observations
+                observations[ag] = self.compute_observation_by_id(ag_id)
 
-            # compute term trunc reward
-            term, trunc, rew, info = self.compute_term_trunc_reward_info_by_id(ag_id)
+                self.current_term[ag] = term
+                self.current_trun[ag] = trunc
+                self.current_acc_rew[ag] += rew
+                self.current_inf[ag] = {**infos[ag], **info}
+                self.current_obs[ag] = observations[ag]
+                self.save_step_data(ag)
 
-            terminations[ag] |= term
-            truncations[ag] |= trunc
-            rewards[ag] += rew
-            infos[ag] = {**infos[ag], **info}
-
-            # compute observations
-            observations[ag] = self.compute_observation_by_id(ag_id)
-
-
-
-            if self.manager.downed_lm[ag_id]:
-                rewards[ag] -= 10
-                terminations[ag] |= True
-                #truncations[ag] |= True
-                infos[ag]['downed'] = True
-
-            self.current_term[ag] = term
-            self.current_trun[ag] = trunc
-            self.current_acc_rew[ag] += rew
-            self.current_inf[ag] = {**infos[ag], **info}
-            self.current_obs[ag] = observations[ag]
-            self.save_step_data(ag)
-
-            if terminations[ag] or truncations[ag]:
-                self.disarm_drone(ag_id)
-                collisions_ids = self.get_collision_ids(ag_id)
-                #lw_down, lm_down = [],[]
-
-                for id in collisions_ids:
-                    # if self.drone_classes[id] == 'lw':
-                    self.disarm_drone(id)
-
-                    if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
-                        self.targets.remove(self.drone_id_mapping[id])
-
-                    if self.drone_classes[id] == 'lw':
-                        pass
-
-
-
-
-
-                #lw_down = [i for i in collisions_ids if self.drone_classes[i] == 'lw']
-                #lm_down = [i for i in collisions_ids if self.drone_classes[i] == 'lm']
-
-                #if any(lw_down):
-                    #print(f'Kamizaze {ag} destroyed lw {lw_down}!')
-                #elif any(lm_down):
-                    #print(f'Kamizaze {ag} friendly-fired lm {lm_down}!')
-        # increment step count and cull dead agents for the next round
-        self.step_count += 1
-        self.agents = [
-            agent
-            for agent in self.agents
-            if not (terminations[agent] or truncations[agent])
-        ]
-
-        self.update_control_lists()
+            # increment step count and cull dead agents for the next round
+            self.step_count += 1
+            self.agents = [
+                agent
+                for agent in self.agents
+                if not (terminations[agent] or truncations[agent])
+            ]
+            self.update_control_lists()
 
         # all targets destroyed, End.
         if self.targets == []:
             terminations = {k: True for k in self.agents}
             truncations = {k: True for k in self.agents}
-            infos = {key: {'mission_complete': True, **infos[key]} for key in infos}
-            #print(infos)
-
-        # if not any(self.agents):
-        #     print(f'{self.manager.downed_lm}')
+            infos = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
 
         return observations, rewards, terminations, truncations, infos
 
-    # def _compute_agent_states(self) -> None:
-    #     """_compute_agent_states.
-    #
-    #     Args:
-    #
-    #     Returns:
-    #         None:
-    #     """
-    #
-    #     self.past_magnitude = self.current_magnitude.copy()
-    #     self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]
-    #
-    #     # get the states of all drones
-    #     self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
-    #     rotation, self.forward_vecs = MAQuadXBaseEnv.compute_rotation_forward(self.attitudes[:, 1])
-    #     self.drone_positions = self.attitudes[3,:]
-    #
-    #     # compute the vectors of each drone to each drone
-    #     self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
-    #     self.previous_distance = self.current_distance.copy()
-    #
-    #     # Compute the norm along the last axis for each pair of drones
-    #     self.current_distance = np.linalg.norm(self.separation, axis=-1)
-    #
-    #     # compute engagement angles (foward vectors angles?)
-    #     self.previous_angles = self.current_angles.copy()
-    #
-    #     x1 = np.sum(self.separation * self.forward_vecs, axis=-1)
-    #     x2 = self.current_distance
-    #     self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
-    #
-    #     # self.previous_traj_angles = self.current_traj_angles.copy()
-    #     normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
-    #     # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
-    #     # self.current_traj_angles = np.arccos(np.divide(x3, x2, where=x2 != 0))
-    #
-    #     self.previous_vel_angles = self.current_vel_angles.copy()
-    #     lin_vel = self.attitudes[: ,2]
-    #     normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
-    #     x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
-    #     self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
-    #
-    #
-    #     self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
-    #     self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
-    #     self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
-    #
-
     #------------------------------ Env End ----------------------------------------------------
+
+    def compute_collisions(self,ag_id):
+
+        explosion_mapping = self.get_explosion_mapping(ag_id)
+
+        for id, type in explosion_mapping.items():
+            target = self.drone_id_mapping[id]
+            if type == 'lw':
+                self.disarm_drone(id)
+                if target in self.targets:  # avoid double removing in the same iteration
+                    self.targets.remove(target)
+
+
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -725,7 +658,6 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         start_orn_lm = (np_random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
 
-
         return np.concatenate([start_pos_lm, start_pos_lw]), np.concatenate([start_orn_lm, start_orn_lw]), lw_formation_center
 
 
@@ -784,7 +716,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.uav_mapping = np.array(['lm'] * len(self.agents) + ['lw'] * len(self.targets))
 
         self.num_drones = len(self.agents) + len(self.targets)
-
 
 
     def draw_forward_vector(self, drone_index, line_id = None, length=1.0, lineColorRGB=[1, 0, 0] ):
@@ -973,6 +904,21 @@ class MAQuadXBaseEnv(ParallelEnv):
         collisions = np.where(self.collision_matrix[self.aviary.drones[agent_id].Id][1:])[0]
         return collisions
 
+    def get_explosion_mapping(self, agent_id):
+        collisions = np.where(self.collision_matrix[self.aviary.drones[agent_id].Id][1:])[0]
+        explosion_mapping = {key: value for key, value in self.drone_classes.items() if key in collisions}
+
+        return explosion_mapping
+
+    def get_collateral_explosions(self, agent_id):
+        explosions_in_range = self.get_collision_ids(agent_id)
+
+        collateral_explosions = [id for id in explosions_in_range if 'lw' in self.get_type_collision(id)]
+
+        if len(collateral_explosions) > 0:
+            return True
+        else:
+            return False
 
     def create_collision_matrix(self, distance_threshold):
         # Initialize a num_bodies x num_bodies matrix with False values
@@ -992,8 +938,6 @@ class MAQuadXBaseEnv(ParallelEnv):
                     collision_matrix[j][i] = True  # The matrix is symmetric
 
         return collision_matrix
-
-
 
 
     def draw_debug_vectors(self):
