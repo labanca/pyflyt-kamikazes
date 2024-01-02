@@ -13,7 +13,7 @@ from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
 
 from PyFlyt.core import Aviary
-from modules.aviary_tests import LWManager
+from modules.lwsfm import LWManager
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
@@ -34,9 +34,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         render_mode: None | str = None,
         seed: int = None,
         num_lm: int = 1,
+        num_lw: int = 1,
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
+        black_death: bool = False
     ):
         """__init__.
 
@@ -123,14 +125,19 @@ class MAQuadXBaseEnv(ParallelEnv):
             start_pos.shape == start_orn.shape
         ), f"Expected `start_pos` to be of shape [num_agents, 3], got {start_pos.shape}."
 
+        #self.black_death = black_death
         self.start_pos = start_pos
         self.start_orn = start_orn
         self.spawn_settings = spawn_settings
         self.seed = seed
-        self.num_lm = self.spawn_settings['num_lm'] # num_lm
         self.num_drones = len(start_pos)
+        self.num_lm = num_lm #self.spawn_settings['num_lm']
+        self.num_lw = num_lw #self.spawn_settings['num_lw']
         self.formation_center = formation_center
+        self.lethal_distance = 1
+        self.lethal_angle = 0.1
 
+        self.rewards_data = []
         self.rew_log = [
             [
                 'self.aviary.elapsed_time'
@@ -258,9 +265,25 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.aviary.disconnect()
         self.step_count = 0
 
-        #update lists to reset death agents
+        np_random = np.random.RandomState(seed=seed)
+
+        if self.spawn_settings is not None:
+            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
+
         self.agents = self.possible_agents[:]
         self.targets = self.possible_targets[:]
+
+        self.current_term = {k: False for k in self.agents}
+        self.current_trun = {k: False for k in self.agents}
+        self.current_acc_rew = {k: 0.0 for k in self.agents}
+        self.current_inf = {k: dict() for k in self.agents}
+        self.current_obs = {k: [] for k in self.agents}
+        self.rew_closing_distance = 0.0
+        self.rew_engaging_enemy = 0.0
+        self.rew_speed_magnitude = 0.0
+        self.rew_near_engagement = 0.0
+        self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
+
 
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
@@ -268,6 +291,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.drone_id_mapping = dict(enumerate(self.drone_list))
         self.drone_classes = dict(enumerate(self.uav_mapping))
 
+        self.attitudes= np.zeros((self.num_drones, 4,3), dtype=np.float64)
+        self.drone_positions = np.zeros((self.num_drones, 3), dtype=np.float64)
 
         self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
         self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
@@ -277,7 +302,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.past_magnitude = np.zeros(self.num_drones, dtype=np.float64)
         self.current_magnitude = np.zeros(self.num_drones, dtype=np.float64)
 
-        self.foward_vecs = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
+        self.forward_vecs = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.separation = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
 
         self.previous_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
@@ -295,11 +320,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
 
-
-        if self.spawn_settings is not None:
-            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
-
-
+        self.squad_id_mapping = {}
 
         # rebuild the environment
         self.aviary = Aviary(
@@ -312,7 +333,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         )
 
         self.change_visuals()
-        #self.init_debug_vectors()
+        self.init_debug_vectors()
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -326,19 +347,19 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.update_control_lists()
 
-        self.manager = LWManager(start_pos=self.start_pos,
-                                 armed_uav_types=self.armed_uav_types,
-                                 uav_id_types=self.drone_classes,
+        self._compute_agent_states()
+
+        self.manager = LWManager(env=self,
                                  formation_radius=1.0,
-                                 aviary=self.aviary,
-                                 detect_threat_radius=4.0,
+                                 threat_radius=4.0,
                                  shoot_range=2.0,
-                                 formation_center=self.formation_center
                                  )
 
         # wait for env to stabilize
         for _ in range(10):
             self.aviary.step()
+
+
 
     def compute_auxiliary_by_id(self, agent_id: int):
         """This returns the auxiliary state form the drone."""
@@ -380,6 +401,17 @@ class MAQuadXBaseEnv(ParallelEnv):
         """
         raise NotImplementedError
 
+    def _compute_agent_states(self) -> None:
+        """compute_observation_by_id.
+
+        Args:
+            agent_id (int): agent_id
+
+        Returns:
+            Any:
+        """
+        raise NotImplementedError
+
     def compute_base_term_trunc_reward_info_by_id(
         self, agent_id: int
     ) -> tuple[bool, bool, float, dict[str, Any]]:
@@ -400,32 +432,37 @@ class MAQuadXBaseEnv(ParallelEnv):
             reward -= 100.0
             info["crashes"] = True
             term |= True
-            trunc |= True
+            #trunc |= True
 
         # exceed flight dome
         if np.linalg.norm(self.aviary.state(agent_id)[-1]) > self.flight_dome_size:
             reward -= 100.0
             info["out_of_bounds"] = True
             term |= True
-            trunc |= True
+            #trunc |= True
 
         # collide with other kamikaze
         colissions = self.get_friendlyfire_type_collision(agent_id)
         if 'lm' in colissions:
-            reward -= 100.0
-            info["friendly_fire"] = True
+            reward -= 10.0
+            info["ally_collision"] = True
             term |= True
-            trunc |= True
+            #trunc |= True
 
-
-        # collide with any loyal wingmen
-        colissions = self.get_type_collision(agent_id)
-        if 'lw' in colissions:
+        # destroy with any loyal wingmen
+        midrange_collisions = self.get_type_collision(agent_id)
+        if 'lw' in midrange_collisions:
             reward += 10000.0
-            info["success"] = True
+            info["exploded_target"] = True
             term |= True
-            trunc |= True
+            #trunc |= True
 
+        # # being near of other lm
+        # if 'lm' in midrange_collisions:
+        #     reward -= 1.0
+        #     #info["exploded_ally"] = True
+        #     #term |= True
+        #     #trunc |= True
 
         return term, trunc, reward, info
 
@@ -474,10 +511,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             if self.get_drone_type_by_id(id) == 'lm':
                 self.current_actions[id] = actions[uav]
                 self.aviary.set_setpoint(id, self.current_actions[id])
-            # elif self.get_drone_type_by_id(id) == 'lw':
-            #     self.current_actions[id] = self.get_lw_action(id)
-
-        #self.aviary.set_all_setpoints(self.current_actions)
 
         # observation and rewards dictionary
         observations = dict()
@@ -489,20 +522,22 @@ class MAQuadXBaseEnv(ParallelEnv):
         # step enough times for one RL step
         for _ in range(self.env_step_ratio):
 
-            #self.control_drones(actions)
             self.aviary.step()
-            self.manager.compute_state()
-            self.manager.update()
+            self._compute_agent_states()
+            self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
+            self.manager.update(stand_still=False)
 
             # Debug, draw vel forward and trajectory vectors
             #self.draw_debug_vectors()
 
             # Avoid losing detect a collision with aviary steps without a RL step. Do not consider ground collision
-            # Only breaks for the agents in self.agents (terminated agents do not stop the aviary steps)
             if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
                 break
 
-        self.collision_matrix = self.create_collision_matrix(distance_threshold=0.35)
+            if any([self.collision_matrix[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
+                break
+
+
 
         # update reward, term, trunc, for each agent
         for ag in self.agents:
@@ -519,20 +554,47 @@ class MAQuadXBaseEnv(ParallelEnv):
             # compute observations
             observations[ag] = self.compute_observation_by_id(ag_id)
 
-            # TODO: To solve: File "C:\projects\pyflyt_parallel\venv\lib\site-packages\pettingzoo\modules\conversions.py", line 357, in step assert action is None
-            # I believe this can be solved inside compute_term_trunc_reward_info_by_id with trunc |= true
+
+
+            if self.manager.downed_lm[ag_id]:
+                rewards[ag] -= 10
+                terminations[ag] |= True
+                #truncations[ag] |= True
+                infos[ag]['downed'] = True
+
+            self.current_term[ag] = term
+            self.current_trun[ag] = trunc
+            self.current_acc_rew[ag] += rew
+            self.current_inf[ag] = {**infos[ag], **info}
+            self.current_obs[ag] = observations[ag]
+            self.save_step_data(ag)
+
             if terminations[ag] or truncations[ag]:
                 self.disarm_drone(ag_id)
-
                 collisions_ids = self.get_collision_ids(ag_id)
-                for id in collisions_ids:
-                    #if self.drone_classes[id] == 'lw':
-                        self.disarm_drone(id)
-                        if self.drone_id_mapping[id] in self.targets: # avoid double removing in the same iteration
-                            self.targets.remove(self.drone_id_mapping[id])
-                        if self.drone_classes[id] == 'lw':
-                            pass
+                #lw_down, lm_down = [],[]
 
+                for id in collisions_ids:
+                    # if self.drone_classes[id] == 'lw':
+                    self.disarm_drone(id)
+
+                    if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
+                        self.targets.remove(self.drone_id_mapping[id])
+
+                    if self.drone_classes[id] == 'lw':
+                        pass
+
+
+
+
+
+                #lw_down = [i for i in collisions_ids if self.drone_classes[i] == 'lw']
+                #lm_down = [i for i in collisions_ids if self.drone_classes[i] == 'lm']
+
+                #if any(lw_down):
+                    #print(f'Kamizaze {ag} destroyed lw {lw_down}!')
+                #elif any(lm_down):
+                    #print(f'Kamizaze {ag} friendly-fired lm {lm_down}!')
         # increment step count and cull dead agents for the next round
         self.step_count += 1
         self.agents = [
@@ -548,26 +610,114 @@ class MAQuadXBaseEnv(ParallelEnv):
             terminations = {k: True for k in self.agents}
             truncations = {k: True for k in self.agents}
             infos = {key: {'mission_complete': True, **infos[key]} for key in infos}
-            print(infos)
+            #print(infos)
+
+        # if not any(self.agents):
+        #     print(f'{self.manager.downed_lm}')
 
         return observations, rewards, terminations, truncations, infos
 
+    # def _compute_agent_states(self) -> None:
+    #     """_compute_agent_states.
+    #
+    #     Args:
+    #
+    #     Returns:
+    #         None:
+    #     """
+    #
+    #     self.past_magnitude = self.current_magnitude.copy()
+    #     self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]
+    #
+    #     # get the states of all drones
+    #     self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
+    #     rotation, self.forward_vecs = MAQuadXBaseEnv.compute_rotation_forward(self.attitudes[:, 1])
+    #     self.drone_positions = self.attitudes[3,:]
+    #
+    #     # compute the vectors of each drone to each drone
+    #     self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
+    #     self.previous_distance = self.current_distance.copy()
+    #
+    #     # Compute the norm along the last axis for each pair of drones
+    #     self.current_distance = np.linalg.norm(self.separation, axis=-1)
+    #
+    #     # compute engagement angles (foward vectors angles?)
+    #     self.previous_angles = self.current_angles.copy()
+    #
+    #     x1 = np.sum(self.separation * self.forward_vecs, axis=-1)
+    #     x2 = self.current_distance
+    #     self.current_angles = np.arccos(np.divide(x1, x2, where=x2 != 0))
+    #
+    #     # self.previous_traj_angles = self.current_traj_angles.copy()
+    #     normalized_separation = self.separation / (self.current_distance[:, :, np.newaxis] + 1e-10)
+    #     # x3 = np.sum(normalized_separation * self.forward_vecs, axis=-1)
+    #     # self.current_traj_angles = np.arccos(np.divide(x3, x2, where=x2 != 0))
+    #
+    #     self.previous_vel_angles = self.current_vel_angles.copy()
+    #     lin_vel = self.attitudes[: ,2]
+    #     normalized_lin_vel = lin_vel / (np.linalg.norm(lin_vel, axis=-1, keepdims=True) + 1e-10)
+    #     x4 = np.sum(normalized_separation * normalized_lin_vel, axis=-1)
+    #     self.current_vel_angles = np.arccos(np.clip(x4, -1.0, 1.0))  # angles between velocity and separation vectors
+    #
+    #
+    #     self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
+    #     self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
+    #     self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
+    #
+
     #------------------------------ Env End ----------------------------------------------------
+
+    @staticmethod
+    def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Computes the rotation matrix and forward vector of an aircraft given its orientation.
+
+        Args:
+            orn (np.ndarray): an [n, 3] array of each drone's orientation
+
+        Returns:
+            np.ndarray: an [n, 3, 3] rotation matrix of each aircraft
+            np.ndarray: an [n, 3] forward vector of each aircraft
+        """
+        c, s = np.cos(orn), np.sin(orn)
+        eye = np.stack([np.eye(3)] * orn.shape[0], axis=0)
+
+        rx = eye.copy()
+        rx[:, 1, 1] = c[..., 0]
+        rx[:, 1, 2] = -s[..., 0]
+        rx[:, 2, 1] = s[..., 0]
+        rx[:, 2, 2] = c[..., 0]
+        ry = eye.copy()
+        ry[:, 0, 0] = c[..., 1]
+        ry[:, 0, 2] = s[..., 1]
+        ry[:, 2, 0] = -s[..., 1]
+        ry[:, 2, 2] = c[..., 1]
+        rz = eye.copy()
+        rz[:, 0, 0] = c[..., 2]
+        rz[:, 0, 1] = -s[..., 2]
+        rz[:, 1, 0] = s[..., 2]
+        rz[:, 1, 1] = c[..., 2]
+
+        forward_vector = np.stack(
+            [c[..., 2] * c[..., 1], s[..., 2] * c[..., 1], -s[..., 1]], axis=-1
+        )
+
+        # order of operations for multiplication matters here
+        return rz @ ry @ rx, forward_vector
 
     @staticmethod
     def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0, num_lw=3, min_z=1.0,
                                lm_center_bounds=5, lm_spawn_radius=10, num_lm=3,):
 
         np_random = np.random.RandomState(seed=seed)
-        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_spawn_radius),
-                               np.random.uniform(-lw_center_bounds, lw_spawn_radius),
+        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_center_bounds),
+                               np.random.uniform(-lw_center_bounds, lw_center_bounds),
                                np.random.uniform(min_z, lw_spawn_radius + min_z)]
 
         start_pos_lw = LWManager.generate_formation_pos(lw_formation_center, num_lw, lw_spawn_radius)
         start_orn_lw = np.zeros_like(start_pos_lw)
 
-        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_spawn_radius),
-                               np.random.uniform(-lm_center_bounds, lm_spawn_radius),
+        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_center_bounds),
+                               np.random.uniform(-lm_center_bounds, lm_center_bounds),
                                np.random.uniform(min_z, lm_spawn_radius + min_z)]
 
         start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_spawn_radius,
@@ -594,8 +744,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
 
             # Check if the generated coordinates are outside the exclusion area of the lw formation
-            lw_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-            if lw_distance > lw_spawn_radius:
+            lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
+            if lm_distance > lw_spawn_radius * 2:
                 lm_coordinates.append([x, y, z])
 
         return np.array(lm_coordinates)
@@ -667,17 +817,17 @@ class MAQuadXBaseEnv(ParallelEnv):
         # Draw the line in PyBullet
         if line_id is not None:
 
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2,  replaceItemUniqueId=line_id
             )
         else:
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2, parentObjectUniqueId=drone_index
             )
 
-        return self.foward_debug_line
+        return self.forward_debug_line
 
     def draw_vel_vector(self, drone_index, line_id = None, length=1.0, lineColorRGB=[1, 1, 0] ):
         # Calculate the forward vector based on the drone's orientation
@@ -694,17 +844,36 @@ class MAQuadXBaseEnv(ParallelEnv):
         # Draw the line in PyBullet
         if line_id is not None:
 
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2,  replaceItemUniqueId=line_id
             )
         else:
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2, parentObjectUniqueId=drone_index
             )
 
-        return self.foward_debug_line
+        return self.forward_debug_line
+
+    def draw_v1v2_vector(self, v1, v2, line_id = None, length=1.0, lineColorRGB=[1, 1, 0]):
+        # Calculate the forward vector based on the drone's orientation
+
+        # Calculate the end point of the vector
+        end_point = [v1[0] - length * v2[0],
+                     v2[1] - length * v2[1],
+                     v2[2] - length * v2[2]]
+
+        # Draw the line in PyBullet
+        if line_id is not None:
+
+            self.forward_debug_line = self.aviary.addUserDebugLine(
+                v1, end_point, lineColorRGB=lineColorRGB,
+                lineWidth=2,  replaceItemUniqueId=line_id
+            )
+
+
+        return self.forward_debug_line
 
 
 
@@ -722,16 +891,16 @@ class MAQuadXBaseEnv(ParallelEnv):
         # Draw the line in PyBullet
         if line_id is not None:
 
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2, replaceItemUniqueId=line_id
             )
         else:
-            self.foward_debug_line = self.aviary.addUserDebugLine(
+            self.forward_debug_line = self.aviary.addUserDebugLine(
                 drone_pos, end_point, lineColorRGB=lineColorRGB,
                 lineWidth=2, parentObjectUniqueId=drone_index)
 
-        return self.foward_debug_line
+        return self.forward_debug_line
 
     def find_nearest_lw(self, agent_id: int) -> int:
         # Assuming compute_observation_by_id has been called to update self.current_distance
@@ -741,7 +910,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         lw_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lw'])
 
-        if not lw_indices.any():
+        if not lw_indices.any(): # TODO seems wrong
             return self.find_nearest_lm(agent_id)
 
         # Filter distances based on 'lw' indices
@@ -752,13 +921,24 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         return nearest_lw_index
 
-    def find_nearest_lm(self, agent_id: int) -> int:
+    def find_nearest_lm(self, agent_id: int, exclude_self = False):
         # Assuming compute_observation_by_id has been called to update self.current_distance
-        distances = self.current_distance[agent_id, :]
 
         self.update_control_lists()
 
-        lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
+        distances = self.current_distance[agent_id, :]
+
+        if exclude_self:
+            lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm' and key != agent_id])
+        else:
+            lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
+
+
+        if not len(lm_indices) > 0:
+            if self.drone_classes == 'lw':
+                return None # for LWManager works
+            else:
+                return -1
 
         # Filter distances based on 'lw' indices
         lm_distances = distances[lm_indices]
@@ -814,36 +994,31 @@ class MAQuadXBaseEnv(ParallelEnv):
         return collision_matrix
 
 
+
+
     def draw_debug_vectors(self):
 
         self.agent_forward_line = self.draw_forward_vector(
-            0 + 1, line_id=self.agent_forward_line, length=0.35, lineColorRGB=[1, 0, 0]
+            1, line_id=self.agent_forward_line, length=0.35, lineColorRGB=[1, 0, 0]
         )
         self.target_forward_line = self.draw_forward_vector(
-            0 + 1, line_id=self.target_forward_line, length=0.35, lineColorRGB=[0, 0, 1]
+            1, line_id=self.target_forward_line, length=0.35, lineColorRGB=[0, 0, 1]
         )
 
         self.agent_vel_line = self.draw_vel_vector(
-            0 + 1, line_id=self.agent_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
+            1, line_id=self.agent_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
         )
         self.target_vel_line = self.draw_vel_vector(
-            1 + 1, line_id=self.target_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
+            1, line_id=self.target_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
         )
 
         self.target_traj_line = self.draw_separation_vector(
-            0 + 1,
+            1,
             line_id=self.agent_traj_line,
-            separation_vector=self.separation[1][0],
+            separation_vector=self.separation[2][0],
             lineColorRGB=[0, 1, 0]
         )
 
-
-    def control_drones(self, actions):
-
-        for id, uav in self.armed_uavs.items():
-            if self.get_drone_type_by_id(id) == 'lw':
-                nearest_lm = self.find_nearest_lm(id)
-                self.current_actions[id] = self.get_lw_action(id)
 
     def change_visuals(self):
         LightBlue = [0.5, 0.5, 1, 1]
@@ -863,14 +1038,101 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.target_vel_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[1,1,0], lineWidth=2)
         self.agent_traj_line = self.aviary.addUserDebugLine([0,0,0], [0,0,1], lineColorRGB=[0,1,0], lineWidth=2)
 
-    def save_data(self):
-        pass
-        #  if 'lm' not in self.uav_mapping[[self.agent_name_mapping[agent] for agent in self.agents]]:
-        # if all(terminations):
-        #      #truncations = {key: True for key in truncations}
-        #     truncations[ag] = True
-        #
-        # if all(terminations.values()) or all(truncations.values()):
-        #     df = pd.DataFrame(self.rew_log)
-        #
-        #     df.to_csv('rew_log.csv', float_format='%.4f', decimal='.', sep=';', index=False, header=False )
+
+    def decode_observation(self, obs) -> dict:
+
+        ang_vel = obs[:3]
+        quaternion = obs[3:7]
+        lin_vel = obs[7:10]
+        lin_pos = obs[10:13]
+        aux_state = obs[13:17]
+        past_actions = obs[17:21]
+        vel_magnitude = obs[21]
+        ally_lin_vel = obs[22:25]
+        ally_lin_pos = obs[25:28]
+        ang_vel_target = obs[28:31]
+        quaternion_target = obs[31:35]
+        lin_vel_target = obs[35:38]
+        lin_pos_target = obs[38:41]
+        target_last_shot_time = obs[41]
+
+        return {
+            "ang_vel": ang_vel,
+            "quaternion": quaternion,
+            "lin_vel": lin_vel,
+            "lin_pos": lin_pos,
+            "aux_state": aux_state,
+            "past_actions": past_actions,
+            'vel_magnitude': vel_magnitude,
+            "ally_lin_vel": ally_lin_vel,
+            "ally_lin_pos": ally_lin_pos,
+            "ang_vel_target": ang_vel_target,
+            "quaternion_target": quaternion_target,
+            "lin_vel_target": lin_vel_target,
+            "lin_pos_target": lin_pos_target,
+            "target_last_shot_time": target_last_shot_time,
+        }
+
+    def print_obs_variables(self, obs):
+        ang_vel = obs[:3]
+        quaternion = obs[3:7]
+        lin_vel = obs[7:10]
+        lin_pos = obs[10:13]
+        aux_state = obs[13:17]
+        past_actions = obs[17:21]
+        ally_lin_vel = obs[21:24]
+        ally_lin_pos = obs[24:27]
+        ang_vel_target = obs[27:30]
+        quaternion_target = obs[30:34]
+        lin_vel_target = obs[34:37]
+        lin_pos_target = obs[37:40]
+
+        print(f"ang_vel: {ang_vel}")
+        print(f"quaternion: {quaternion}")
+        print(f"lin_vel: {lin_vel}")
+        print(f"lin_pos: {lin_pos}")
+        print(f"aux_state: {aux_state}")
+        print(f"past_actions: {past_actions}")
+        print(f"ally_lin_vel: {ally_lin_vel}")
+        print(f"ally_lin_pos: {ally_lin_pos}")
+        print(f"ang_vel_target: {ang_vel_target}")
+        print(f"quaternion_target: {quaternion_target}")
+        print(f"lin_vel_target: {lin_vel_target}")
+        print(f"lin_pos_target: {lin_pos_target}")
+
+
+    def save_step_data(self, agent):
+        agent_id = self.agent_name_mapping[agent]
+        target_id = self.current_target_id[agent_id]
+        step_data = {
+            "agent_id": agent_id,
+            "elapsed_time": self.aviary.elapsed_time,
+            "rew_closing_distance": self.rew_closing_distance,
+            "rew_engaging_enemy": self.rew_engaging_enemy,
+            "rew_speed_magnitude": self.rew_speed_magnitude,
+            "rew_near_engagement": self.rew_near_engagement,
+            "acc_rewards": self.current_acc_rew[agent],
+            "vel_angles": self.current_vel_angles[agent_id][target_id],
+            "approaching": int(self.approaching[agent_id][target_id]),
+            "chasing": int(self.chasing[agent_id][target_id]),
+            "in_range": int(self.in_range[agent_id][target_id]),
+            "current_term": int(self.current_term[agent]),
+            "info[downed]": int(self.current_inf[agent].get('downed', False)),
+            "info[exploded_target]": int(self.current_inf[agent].get('exploded_target', False)),
+            "info[exploded_ally]": int(self.current_inf[agent].get('exploded_ally', False)),
+            "info[crashes]": int(self.current_inf[agent].get('crashes', False)),
+            "info[ally_collision]": int(self.current_inf[agent].get('ally_collision', False)),
+            "info[mission_complete]": int(self.current_inf[agent].get('mission_complete', False)),
+            "info[out_of_bounds]": int(self.current_inf[agent].get('out_of_bounds', False)),
+            "info[timeover]": int(self.current_inf[agent].get('timeover', False)),
+
+        }
+        self.rewards_data.append(step_data)
+
+
+    def drone_alive(self, drone_id):
+
+        if drone_id in self.armed_uavs.keys():
+            return True
+        else:
+            return False

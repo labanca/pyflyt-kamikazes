@@ -1,0 +1,84 @@
+train_desc='LW no fight back.\n            # reward for closing the distance\n            rew_closing_distance = np.clip(\n                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 1.0,\n                a_min=-10.0,\n                a_max=None,\n            ) * (\n                    self.chasing[agent_id][target_id]\n                )\n\n            # reward for engaging the enemy\n            rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],\n                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (\n                    self.chasing[agent_id][target_id]\n                    * self.approaching[agent_id][target_id]\n                    * 1.0\n                )\n\n            # reward for maintaning linear velocities.\n            rew_speed_magitude =(\n                    (self.current_magnitude[agent_id])\n                    * self.chasing[agent_id][target_id]\n                    * self.approaching[agent_id][target_id]\n            )\n\n            self.rewards[agent_id] += (\n                    rew_closing_distance\n                    + rew_engaging_enemy\n                    + rew_speed_magitude\n            )\n'
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-26 01:04:51.301349
+elapsed_time=4:09:27.062054
+model.num_timesteps=20152320
+device=device(type='cuda')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[256, 256, 256]
+num_cpus=12
+num_vec_envs=12
+model.n_envs=120
+model.n_steps=2048
+model.n_epochs=10
+model.batch_size=512
+random_respawn=True
+spawn_settings={'lw_center_bounds': 5.0, 'lm_center_bounds': 5, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 5, 'num_lm': 10}
+completion_datetime=2023-12-26 05:14:18.363403
+model.action_space=Box(-10.0, 10.0, (4,), float64)
+model.observation_space=Box(-inf, inf, (40,), float64)
+env_kwargs={'start_pos': array([[10.62010008, -2.24686645,  4.74670187],
+       [10.47309726,  5.44946789,  9.34378384],
+       [-0.16397878,  6.04515985,  2.28509918],
+       [ 8.6006432 , -9.7671547 ,  4.68523518],
+       [ 2.25314254, -5.95219931,  9.88660855],
+       [ 9.91029251,  7.72345915, 11.47004007],
+       [ 4.9100497 , -1.14423746,  2.03450287],
+       [10.86839695, -9.94712049,  1.23207285],
+       [ 1.38033156, -3.0928112 ,  7.72227976],
+       [11.50728252, -5.58785447,  3.03136988],
+       [-3.0195434 , -2.47335243,  1.75763857],
+       [-3.71052641, -1.52229592,  1.75763857],
+       [-4.8285604 , -1.88556718,  1.75763857],
+       [-4.8285604 , -3.06113768,  1.75763857],
+       [-3.71052641, -3.42440895,  1.75763857]]), 'start_orn': array([[-0.96691808,  0.27476704,  3.47367062],
+       [ 0.24326792, -0.36725402,  4.32629064],
+       [-0.3692103 ,  0.71322932, -3.41317401],
+       [ 0.61258062, -0.39202574, -1.75870139],
+       [ 0.97436548, -0.01276003, -3.40950712],
+       [-0.57882491, -0.95771634,  3.76620943],
+       [-0.81297609,  0.31218216, -5.69725228],
+       [-0.48998126,  0.61290238,  0.38874009],
+       [ 0.86595277,  0.26205329,  0.31369603],
+       [-0.31677127, -0.80996103,  0.95545762],
+       [ 0.        ,  0.        ,  0.        ],
+       [ 0.        ,  0.        ,  0.        ],
+       [ 0.        ,  0.        ,  0.        ],
+       [ 0.        ,  0.        ,  0.        ],
+       [ 0.        ,  0.        ,  0.        ]]), 'formation_center': [-4.0195434037167574, -2.473352431901052, 1.757638569178547], 'flight_dome_size': 40.0, 'spawn_settings': {'lw_center_bounds': 5.0, 'lm_center_bounds': 5, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 5, 'num_lm': 10}}
+model.policy_kwargs={'net_arch': {'pi': [256, 256, 256], 'vf': [256, 256, 256]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=256, out_features=4, bias=True)
+  (value_net): Linear(in_features=256, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

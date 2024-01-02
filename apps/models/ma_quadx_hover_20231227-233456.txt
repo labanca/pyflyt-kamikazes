@@ -1,0 +1,66 @@
+train_desc="testing only with speed magnitude, now without self.chasing. 5 lm and mag_rew only with a minimal speed.\n\n            self.current_magnitude = [np.linalg.norm(action[np.r_[:2, 3]]) for action in self.current_actions]\n            self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15\n            self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0\n            \n            # reward for maintaning linear velocities.\n            rew_speed_magnitude =(\n                    (self.current_magnitude[agent_id])**2 if self.current_magnitude[agent_id] > 1.5 else 0\n                    * self.approaching[agent_id][target_id]\n                    * 1.0\n            )\n\n            self.rewards[agent_id] += (\n\n                    + rew_speed_magitude\n            )\n"
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\train.py'
+model.start_datetime=2023-12-27 23:19:16.041851
+elapsed_time=0:15:40.575397
+model.num_timesteps=1105920
+device=device(type='cuda')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+nn_t=[256, 256, 256]
+num_cpus=12
+num_vec_envs=12
+model.n_envs=60
+model.n_steps=2048
+model.n_epochs=10
+model.batch_size=512
+random_respawn=True
+spawn_settings={'lw_center_bounds': 5.0, 'lm_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 5}
+completion_datetime=2023-12-27 23:34:56.617248
+model.action_space=Box(-10.0, 10.0, (4,), float64)
+model.observation_space=Box(-inf, inf, (40,), float64)
+env_kwargs={'start_pos': array([[-13.46608936,   3.96780421,  18.38043433],
+       [-16.70483314,  11.82956685,  12.01473971],
+       [-14.0970953 ,  -5.0333184 ,   8.85925265],
+       [-16.61464614,  -0.94405908,  10.30531477],
+       [ -9.93916724,  -5.06574887,  12.40384349],
+       [  1.47020581,  -1.3292538 ,   1.48413435]]), 'start_orn': array([[-0.67815771, -0.33384114, -2.39159779],
+       [ 0.76107469,  0.09020552, -4.49664699],
+       [ 0.52942287,  0.90979284, -5.90900791],
+       [-0.01102812,  0.45065229,  5.60952749],
+       [ 0.26697765,  0.35846768,  3.9027562 ],
+       [ 0.        ,  0.        ,  0.        ]]), 'formation_center': [0.4702058100812474, -1.3292537983098422, 1.48413435163117], 'flight_dome_size': 40.0, 'spawn_settings': {'lw_center_bounds': 5.0, 'lm_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_spawn_radius': 10, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 5}, 'num_lm': 5}
+model.policy_kwargs={'net_arch': {'pi': [256, 256, 256], 'vf': [256, 256, 256]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=256, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=256, out_features=4, bias=True)
+  (value_net): Linear(in_features=256, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

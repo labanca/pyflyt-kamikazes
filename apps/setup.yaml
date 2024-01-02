@@ -1,0 +1,9 @@
+spawn_settings:
+  lw_center_bounds: 10.0
+  lm_center_bounds: 10.0
+  lw_spawn_radius: 1.0
+  lm_spawn_radius: 10
+  min_z: 1.0
+  seed: null
+  num_lw: 5
+  num_lm: 20
