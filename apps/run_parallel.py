@@ -3,8 +3,8 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-#model = PPO.load('models/ma_quadx_hover_20231230-221538.zip')
-model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
+model = PPO.load('models/ma_quadx_hover_20240102-072858.zip')
+#model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -12,16 +12,16 @@ spawn_settings = dict(
     lw_center_bounds=10.0,
     lm_center_bounds=10.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
+    lm_spawn_radius=5,
     min_z=1.0,
     seed=None,
-    num_lw=5,
-    num_lm=7,
+    num_lw=1,
+    num_lm=2,
 )
-
 env_kwargs = {}
 env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
-env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
+env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
+                                  + spawn_settings['lw_center_bounds'] + spawn_settings['lm_spawn_radius'] )   # dome size 50% bigger than the spawn radius
 env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = spawn_settings
 env_kwargs['num_lm'] = spawn_settings['num_lm']
@@ -36,15 +36,14 @@ counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 
 first_time = True
 num_games = 1
 
-last_start_pos = env_kwargs['start_pos']
-while 1:
+while env.agents:
 
 
     #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
-
+    #print(f'{env.current_magnitude=}')
     if first_time == True:
         first_time = False
 
@@ -72,7 +71,7 @@ while 1:
         print(f'{infos=}\n\n\n')
         #time.sleep(5)
         env.save_rewards_data('reward_data.csv')
-        #env.plot_agent_rewards('reward_data.csv', 0)
+        env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
 
 
@@ -82,7 +81,7 @@ while 1:
 
     if num_games == 0:
         print(counters)
-        #break
+        break
 
 
 env.close()

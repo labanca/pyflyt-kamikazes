@@ -43,10 +43,15 @@ class ThreatChaseState(State):
             if not self.drone_fsm.chasing:
                 #print(f"Drone {self.drone_fsm.id} is chasing a threat.")
                 self.drone_fsm.chasing = True
-            if self.drone_fsm.shoot_distance_to_threat():
+
+            if not self.drone_fsm.manager.env.drone_alive(self.drone_fsm.current_threat_id):
+                self.drone_fsm.change_state('GoToFormationState')
+
+            elif self.drone_fsm.at_shoot_distance():
                 self.drone_fsm.change_state('ShootThreatState')
-            elif self.drone_fsm.drone_distance_pos(self.drone_fsm.current_threat_id,
-                                self.drone_fsm.current_threat_pos) > 0.3:
+
+            elif self.drone_fsm.drone_distance_pos(
+                    self.drone_fsm.current_threat_id, self.drone_fsm.current_threat_pos) > 0.1:
                 self.drone_fsm.chase_threat()
 
     def exit(self):
@@ -240,7 +245,7 @@ class LWFSM:
             self.current_threat_pos = None
             return False
 
-    def shoot_distance_to_threat(self):
+    def at_shoot_distance(self):
         # Return True if the LW is at shoot range from the threat
         if self.manager.env.current_distance[self.id][self.current_threat_id] <= self.shoot_range:
             return True
@@ -306,21 +311,21 @@ class LWFSM:
                 #target_drone_velocity = self.manager.env.attitudes[self.current_threat_id][2, :]
                 velocity_magnitude = self.manager.env.current_magnitude[self.current_threat_id] #np.linalg.norm(target_drone_velocity)
                 max_hit_probability = 0.9
-                hit_probability = max_hit_probability - velocity_magnitude / self.manager.max_velocity
+                hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.max_velocity, 0.05)
 
                 # Determine if the shot hits
                 hit = np.random.random() < hit_probability
                 self.gun_loaded = False
+                self.last_shot_time = self.manager.aviary.elapsed_time
 
+                print(f'LW {self.id} {"hit" if hit else False} lm {self.current_threat_id} {self.manager.aviary.elapsed_time=}')
                 if hit:
                     #print(f'Drone {self.id} hit threat {self.current_threat_id}!')
                     # Disarm the target drone if hit
                     self.manager.downed_lm[self.current_threat_id] +=1
 
-                    self.last_shot_time = self.manager.aviary.elapsed_time  # Update last shot time
-
-                    if self.current_threat_id in self.manager.env.armed_uav_types.keys():
-                        self.manager.env.armed_uav_types.pop(self.current_threat_id)
+                    # if self.current_threat_id in self.manager.env.armed_uav_types.keys():
+                    #     self.manager.env.armed_uav_types.pop(self.current_threat_id)
 
                     self.current_threat_id = None
                     self.current_threat_pos = None
@@ -328,7 +333,7 @@ class LWFSM:
                     return True
                 else:
                     #print(f'Drone {self.id} miss {self.current_threat_id}!')
-                    return False  # No targets in range
+                    return False  # misses shot
             else:
                 return False  # Weapon o"n cooldown
         else:
@@ -347,7 +352,7 @@ class LWFSM:
 
     def find_nearest_lm(self, ):
         # Assuming compute_observation_by_id has been called to update self.current_distance
-        distances = self.manager.current_distance[self.id, :]
+        distances = self.manager.env.current_distance[self.id, :]
 
         lm_indices = np.array([key for key, value in self.manager.env.armed_uav_types.items() if value == 'lm'])
 

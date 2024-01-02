@@ -1,6 +1,6 @@
-from PyFlyt.pz_envs import MAFixedwingDogfightEnv
+from modules.envs_test.ma_fixedwing_dogfight_env import MAFixedwingDogfightEnv
 
-env = MAFixedwingDogfightEnv(render_mode="human")
+env = MAFixedwingDogfightEnv(render_mode="human", )
 observations, infos = env.reset()
 
 while env.agents:

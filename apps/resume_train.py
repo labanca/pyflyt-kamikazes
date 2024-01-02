@@ -32,8 +32,8 @@ def train_butterfly_supersuit(
     env = ss.black_death_v3(env)
     env = ss.pettingzoo_env_to_vec_env_v1(env,)
 
-    num_vec_envs = 12 #8
-    num_cpus = 12 #(os.cpu_count() or 1)
+    num_vec_envs = 1 #8
+    num_cpus = 1 #(os.cpu_count() or 1)
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
     device = get_device('cuda')
@@ -46,16 +46,16 @@ def train_butterfly_supersuit(
 
     try:
         latest_policy = max(
-            glob.glob(f"resumes/{env.metadata['name']}*.zip"), key=os.path.getctime
+            glob.glob(f"resumes/{env.unwrapped.metadata.get('name')}*.zip"), key=os.path.getctime
         )
     except:
         latest_policy = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
 
     if resume:
         model_name = latest_policy
-        model_path = f"resumes/{model_name.split('_')[-1]}_res_{time.strftime('%Y%m%d-%H%M%S')}"
+        model_path = f"resumes/{model_name.split('_')[-1]}_res_{time.strftime('%Y%m%d-%H%M%S')}.zip"
         #model = PPO.load(f"models/{model_name}.zip", env=env)
-        model = PPO.load(f"resumes/{model_name}.zip", env=env)
+        model = PPO.load(f"{model_name}", env=env)
         print(f"Starting resume training on {model_name}.")
         print(f'{model.num_timesteps}')
         model.learn(total_timesteps=steps, reset_num_timesteps=False, )
@@ -71,8 +71,8 @@ def train_butterfly_supersuit(
         policy_kwargs=policy_kwargs,
         device=device,
         )
-        model_name = f"models/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
-        print(f"Starting training on {str(env.metadata['name'])}.")
+        model_name = f"resumes/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
+        print(f"Starting training on {str(model_name)}.")
         model.learn(total_timesteps=steps)
         model.save(model_name)
 
@@ -80,7 +80,7 @@ def train_butterfly_supersuit(
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
 
-    with open(f'resumes/{model_name}.txt', 'w') as file:
+    with open(f'{model_name}.txt', 'w') as file:
         # Write train params to file
         start_datetime = datetime.fromtimestamp(model.start_time / 1e9)
         current_time = datetime.now()
@@ -255,9 +255,15 @@ if __name__ == "__main__":
             )
 """
 
-    resume_train = True
+    resume_train = False
     #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, resume=resume_train, **env_kwargs)
+
+    for i in range(12):
+        train_butterfly_supersuit(env_fn, steps=1_000,train_desc=train_desc, resume=resume_train, **env_kwargs)
+        resume_train = True
+
+
+
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

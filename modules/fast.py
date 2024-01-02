@@ -15,13 +15,13 @@ spawn_settings = dict(
     min_z=1.0,
     seed=None,
     num_lw=1,
-    num_lm=1,
+    num_lm=2,
 )
 
 
 env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [-7,-7,1], [0,0,1], ])
-env_kwargs['start_orn'] = np.array([ [0,0,0], [0,0,0] ])
+env_kwargs['start_pos'] = np.array([ [-7,-7,1],[5, 5, 5], [0,0,1],  ])
+env_kwargs['start_orn'] = np.array([ [0,0,0], [0,0,0], [0,0,0] ])
 env_kwargs['formation_center'] = np.array([0,0,1])
 env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
 env_kwargs['seed'] = seed
@@ -41,10 +41,11 @@ last_start_pos = env_kwargs['start_pos']
 while env.agents:
 
 
-    #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
-    actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+    actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
-    actions['agent_0'] = np.array([i, i, 0, 0.14*i])
+    actions['agent_0'] = np.array([i, i, 0, 0.123*i])
+    actions['agent_1'] =  np.array([i, i, 0, 0.123*i])
     i +=1
     observations, rewards, terminations, truncations, infos = env.step(actions)
 
@@ -77,6 +78,7 @@ while env.agents:
         env.save_rewards_data('reward_data.csv')
         #env.plot_rewards_data('reward_data.csv')
         env.plot_agent_rewards('reward_data.csv', 0)
+        env.plot_agent_infos2('reward_data.csv', 0)
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')

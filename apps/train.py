@@ -5,6 +5,7 @@ For more information, see https://stable-baselines3.readthedocs.io/en/master/mod
 Author: Elliot (https://github.com/elliottower)
 """
 from __future__ import annotations
+import yaml
 
 import glob
 import os
@@ -38,8 +39,8 @@ def train_butterfly_supersuit(
     env = ss.pettingzoo_env_to_vec_env_v1(env )
 
 
-    num_vec_envs = 12 #8
-    num_cpus = 12 #(os.cpu_count() or 1)
+    num_vec_envs = 16 #8
+    num_cpus = 16 #(os.cpu_count() or 1)
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
 
@@ -178,11 +179,11 @@ spawn_settings = dict(
     lw_center_bounds=10.0,
     lm_center_bounds=10.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
+    lm_spawn_radius=5,
     min_z=1.0,
     seed=None,
-    num_lw=1,
-    num_lm=2,
+    num_lw=3,
+    num_lm=6,
 )
 
 if __name__ == "__main__":
@@ -190,24 +191,25 @@ if __name__ == "__main__":
 
     env_kwargs = {}
     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
-    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
-                                      spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
+    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
+                                      + spawn_settings['lw_center_bounds'] + spawn_settings[
+                                          'lm_spawn_radius'])
     env_kwargs['seed'] = seed
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
 
     #seed = 42
-    train_desc = """training from zero with FSM on and self.gunloaded in the observation. current magnitude**2 * 1.0 (was* 5.0)
+    train_desc = """training from zero with FSM om obs.shape 42. Trying 6 lm and 3 lw. Collision range 0.5m. trying the trick of past - current_distance * 5 (wasn't * 10 at end of this reward, was *1)
 
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5.0,
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5,
                 a_min=-10.0,
                 a_max=None,
-            ) * (
-                    self.chasing[agent_id][target_id]
-                )
+            ) * 10
+            #* self.chasing[agent_id][target_id]
+
 
             # reward for engaging the enemy
             self.rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
@@ -219,8 +221,8 @@ if __name__ == "__main__":
 
             # # reward for progressing to engagement
             self.rew_near_engagement = (
-                    (self.current_magnitude[agent_id]**2)
-                    * 10.0
+                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
+                    * 100.0
                     * self.in_range[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
                     * self.chasing[agent_id][target_id]
@@ -228,21 +230,23 @@ if __name__ == "__main__":
 
             # reward for maintaning linear velocities.
             self.rew_speed_magnitude =(
-                    (self.current_magnitude[agent_id])**2
-                    #* self.chasing[agent_id][target_id]
+                    (self.current_magnitude[agent_id]**2)
+
                     * self.approaching[agent_id][target_id]
-                    * 1.0
+
             )
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-                    + self.rew_engaging_enemy
+
                     + self.rew_speed_magnitude
+
             )
+
 """
 
-    #Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=2_000_000,train_desc=train_desc, **env_kwargs)
+    #Train a model
+    train_butterfly_supersuit(env_fn, steps=30_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

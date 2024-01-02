@@ -17,11 +17,7 @@ from modules.lwsfm import LWManager
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
-    metadata = {
-        "render_modes": ["human"],
-        "name": "ma_quadx_hover",
-        "black_death": True
-    }
+
     def __init__(
         self,
         spawn_settings: dict(),
@@ -337,7 +333,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         )
 
         self.change_visuals()
-        #self.init_debug_vectors()
+        self.init_debug_vectors()
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -448,25 +444,25 @@ class MAQuadXBaseEnv(ParallelEnv):
         # collide with other kamikaze
         colissions = self.get_friendlyfire_type_collision(agent_id)
         if 'lm' in colissions:
-            reward -= 100.0
+            reward -= 10.0
             info["ally_collision"] = True
             term |= True
             #trunc |= True
 
         # destroy with any loyal wingmen
-        explosions = self.get_type_collision(agent_id)
-        if 'lw' in explosions:
+        midrange_collisions = self.get_type_collision(agent_id)
+        if 'lw' in midrange_collisions:
             reward += 10000.0
             info["exploded_target"] = True
             term |= True
             #trunc |= True
 
-        #destroy other lm
-        if 'lm' in explosions:
-            reward -= 100.0
-            info["exploded_ally"] = True
-            #term |= True
-            #trunc |= True
+        # # being near of other lm
+        # if 'lm' in midrange_collisions:
+        #     reward -= 1.0
+        #     #info["exploded_ally"] = True
+        #     #term |= True
+        #     #trunc |= True
 
         return term, trunc, reward, info
 
@@ -528,6 +524,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
             self.aviary.step()
             self._compute_agent_states()
+            self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
             self.manager.update(stand_still=False)
 
             # Debug, draw vel forward and trajectory vectors
@@ -537,7 +534,10 @@ class MAQuadXBaseEnv(ParallelEnv):
             if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
                 break
 
-        self.collision_matrix = self.create_collision_matrix(distance_threshold=0.35)
+            if any([self.collision_matrix[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
+                break
+
+
 
         # update reward, term, trunc, for each agent
         for ag in self.agents:
@@ -554,12 +554,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             # compute observations
             observations[ag] = self.compute_observation_by_id(ag_id)
 
-            self.current_term[ag] = term
-            self.current_trun[ag] = trunc
-            self.current_acc_rew[ag] += rew
-            self.current_inf[ag] = {**infos[ag], **info}
-            self.current_obs[ag] = observations[ag]
-            self.save_step_data(ag)
+
 
             if self.manager.downed_lm[ag_id]:
                 rewards[ag] -= 10
@@ -567,15 +562,20 @@ class MAQuadXBaseEnv(ParallelEnv):
                 #truncations[ag] |= True
                 infos[ag]['downed'] = True
 
+            self.current_term[ag] = term
+            self.current_trun[ag] = trunc
+            self.current_acc_rew[ag] += rew
+            self.current_inf[ag] = {**infos[ag], **info}
+            self.current_obs[ag] = observations[ag]
+            self.save_step_data(ag)
+
             if terminations[ag] or truncations[ag]:
                 self.disarm_drone(ag_id)
                 collisions_ids = self.get_collision_ids(ag_id)
-                lw_down, lm_down = [],[]
+                #lw_down, lm_down = [],[]
 
                 for id in collisions_ids:
                     # if self.drone_classes[id] == 'lw':
-
-
                     self.disarm_drone(id)
 
                     if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
@@ -856,6 +856,25 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         return self.forward_debug_line
 
+    def draw_v1v2_vector(self, v1, v2, line_id = None, length=1.0, lineColorRGB=[1, 1, 0]):
+        # Calculate the forward vector based on the drone's orientation
+
+        # Calculate the end point of the vector
+        end_point = [v1[0] - length * v2[0],
+                     v2[1] - length * v2[1],
+                     v2[2] - length * v2[2]]
+
+        # Draw the line in PyBullet
+        if line_id is not None:
+
+            self.forward_debug_line = self.aviary.addUserDebugLine(
+                v1, end_point, lineColorRGB=lineColorRGB,
+                lineWidth=2,  replaceItemUniqueId=line_id
+            )
+
+
+        return self.forward_debug_line
+
 
 
     def draw_separation_vector(self, drone_index, separation_vector, line_id = None, length=1.0, lineColorRGB=[1, 0, 0] ):
@@ -915,13 +934,11 @@ class MAQuadXBaseEnv(ParallelEnv):
             lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
 
 
-        lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
-
-        if not lm_indices.any():
-            if self.drone_id_mapping == 'lw':
+        if not len(lm_indices) > 0:
+            if self.drone_classes == 'lw':
                 return None # for LWManager works
             else:
-                return agent_id
+                return -1
 
         # Filter distances based on 'lw' indices
         lm_distances = distances[lm_indices]
@@ -982,23 +999,23 @@ class MAQuadXBaseEnv(ParallelEnv):
     def draw_debug_vectors(self):
 
         self.agent_forward_line = self.draw_forward_vector(
-            0 + 1, line_id=self.agent_forward_line, length=0.35, lineColorRGB=[1, 0, 0]
+            1, line_id=self.agent_forward_line, length=0.35, lineColorRGB=[1, 0, 0]
         )
         self.target_forward_line = self.draw_forward_vector(
-            0 + 1, line_id=self.target_forward_line, length=0.35, lineColorRGB=[0, 0, 1]
+            1, line_id=self.target_forward_line, length=0.35, lineColorRGB=[0, 0, 1]
         )
 
         self.agent_vel_line = self.draw_vel_vector(
-            0 + 1, line_id=self.agent_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
+            1, line_id=self.agent_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
         )
         self.target_vel_line = self.draw_vel_vector(
-            1 + 1, line_id=self.target_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
+            1, line_id=self.target_vel_line, length=0.35, lineColorRGB=[1, 1, 0]
         )
 
         self.target_traj_line = self.draw_separation_vector(
-            0+1,
+            1,
             line_id=self.agent_traj_line,
-            separation_vector=self.separation[1][0],
+            separation_vector=self.separation[2][0],
             lineColorRGB=[0, 1, 0]
         )
 
@@ -1030,13 +1047,14 @@ class MAQuadXBaseEnv(ParallelEnv):
         lin_pos = obs[10:13]
         aux_state = obs[13:17]
         past_actions = obs[17:21]
-        vel_magnitude = obs[22]
-        ally_lin_vel = obs[23:26]
-        ally_lin_pos = obs[26:29]
-        ang_vel_target = obs[29:32]
-        quaternion_target = obs[32:36]
-        lin_vel_target = obs[36:39]
-        lin_pos_target = obs[39:41]
+        vel_magnitude = obs[21]
+        ally_lin_vel = obs[22:25]
+        ally_lin_pos = obs[25:28]
+        ang_vel_target = obs[28:31]
+        quaternion_target = obs[31:35]
+        lin_vel_target = obs[35:38]
+        lin_pos_target = obs[38:41]
+        target_last_shot_time = obs[41]
 
         return {
             "ang_vel": ang_vel,
@@ -1045,13 +1063,14 @@ class MAQuadXBaseEnv(ParallelEnv):
             "lin_pos": lin_pos,
             "aux_state": aux_state,
             "past_actions": past_actions,
-            'vel_magnitude': 'vel_magnitude',
+            'vel_magnitude': vel_magnitude,
             "ally_lin_vel": ally_lin_vel,
             "ally_lin_pos": ally_lin_pos,
             "ang_vel_target": ang_vel_target,
             "quaternion_target": quaternion_target,
             "lin_vel_target": lin_vel_target,
-            "lin_pos_target": lin_pos_target
+            "lin_pos_target": lin_pos_target,
+            "target_last_shot_time": target_last_shot_time,
         }
 
     def print_obs_variables(self, obs):
@@ -1096,7 +1115,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             "vel_angles": self.current_vel_angles[agent_id][target_id],
             "approaching": int(self.approaching[agent_id][target_id]),
             "chasing": int(self.chasing[agent_id][target_id]),
-            "in_range": self.in_range[agent_id][target_id],
+            "in_range": int(self.in_range[agent_id][target_id]),
             "current_term": int(self.current_term[agent]),
             "info[downed]": int(self.current_inf[agent].get('downed', False)),
             "info[exploded_target]": int(self.current_inf[agent].get('exploded_target', False)),
@@ -1109,3 +1128,11 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         }
         self.rewards_data.append(step_data)
+
+
+    def drone_alive(self, drone_id):
+
+        if drone_id in self.armed_uavs.keys():
+            return True
+        else:
+            return False
