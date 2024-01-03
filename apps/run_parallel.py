@@ -10,13 +10,13 @@ seed=None
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
     lw_center_bounds=10.0,
-    lm_center_bounds=10.0,
+    lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=5,
+    lm_spawn_radius=10,
     min_z=1.0,
     seed=None,
-    num_lw=1,
-    num_lm=10,
+    num_lw=10,
+    num_lm=20,
 )
 env_kwargs = {}
 env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)

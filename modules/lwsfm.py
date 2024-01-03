@@ -1,6 +1,6 @@
 import numpy as np
 from PyFlyt.pz_envs.quadx_envs.ma_quadx_hover_env import MAQuadXBaseEnv
-
+#from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
 
 class State:
     def __init__(self, lwfsm ):
@@ -40,19 +40,21 @@ class ThreatChaseState(State):
         self.drone_fsm.chase_threat()
 
     def execute(self):
-            if not self.drone_fsm.chasing:
+            if self.drone_fsm.current_threat_id is None:
                 #print(f"Drone {self.drone_fsm.id} is chasing a threat.")
-                self.drone_fsm.chasing = True
+                self.drone_fsm.change_state('GoToFormationState')
 
-            if not self.drone_fsm.manager.env.drone_alive(self.drone_fsm.current_threat_id):
+            elif not self.drone_fsm.manager.env.uav_alive(self.drone_fsm.current_threat_id):
                 self.drone_fsm.change_state('GoToFormationState')
 
             elif self.drone_fsm.at_shoot_distance():
                 self.drone_fsm.change_state('ShootThreatState')
 
-            elif self.drone_fsm.drone_distance_pos(
-                    self.drone_fsm.current_threat_id, self.drone_fsm.current_threat_pos) > 0.1:
+            elif self.drone_fsm.distance_to_threat() < 5:
                 self.drone_fsm.chase_threat()
+
+            else:
+                self.drone_fsm.change_state('GoToFormationState')
 
     def exit(self):
         #print(f"Drone {self.drone_fsm.id} is exiting threat chase state.")
@@ -64,14 +66,16 @@ class ShootThreatState(State):
         pass
 
     def execute(self):
-        if self.drone_fsm.gun_loaded:
+
+        if self.drone_fsm.current_threat_id is not None:
             if self.drone_fsm.shoot_target():
-
                 self.drone_fsm.change_state('GoToFormationState')
+        else:
+            self.drone_fsm.change_state('GoToFormationState')
 
-        elif not self.drone_fsm.reloading:
-            #print(f"Drone {self.drone_fsm.id} gun is not loaded.")
-            self.drone_fsm.reloading = True
+        # elif not self.drone_fsm.reloading:
+        #     #print(f"Drone {self.drone_fsm.id} gun is not loaded.")
+        #     self.drone_fsm.reloading = True
 
 
     def exit(self):
@@ -107,11 +111,7 @@ class LWManager:
         self.uav_id_types = self.env.drone_classes
         self.aviary = self.env.aviary
         self.threat_radius = threat_radius
-        self.formation_radius = formation_radius
         self.max_velocity = np.linalg.norm(np.linalg.norm([4, 4, 4]))
-        self.num_drones = self.env.num_drones
-        self.num_lw = self.env.num_lw
-        self.num_lm = self.env.num_lm
         self.formation_center = self.env.formation_center
         self.shoot_range = shoot_range
 
@@ -190,7 +190,7 @@ class LWFSM:
                  ):
         self.last_shot_time = 0
         self.current_threat_id = None
-        self.current_threat_pos = None
+        #self.current_threat_pos = None
         self.id = lw_id
         self.thread_radius = threat_radius
         self.shoot_range = shoot_range
@@ -223,9 +223,14 @@ class LWFSM:
         if abs(self.manager.aviary.elapsed_time - self.last_shot_time) >= self.recharge_time:
             self.gun_loaded = True
 
-    def drone_distance_pos(self, drone_id, vector):
+        if self.current_threat_id is not None:
+            if self.manager.downed_lm[self.current_threat_id]:
+                self.current_threat_id = None
+                #self.current_threat_pos = None
 
-        return np.linalg.norm(self.manager.env.drone_positions[drone_id, :] - vector)
+    def distance_to_threat(self):
+
+        return np.linalg.norm(self.manager.env.drone_positions[self.current_threat_id, :] - self.manager.env.drone_positions[self.id, :])
 
     def detect_threat(self):
         # Replace with actual logic to detect a threat
@@ -238,11 +243,11 @@ class LWFSM:
         if self.manager.env.current_distance[self.id][nearest_threat] < self.thread_radius:
 
             self.current_threat_id = nearest_threat
-            self.current_threat_pos = self.manager.env.drone_positions[nearest_threat]
+            #self.current_threat_pos = self.manager.env.drone_positions[nearest_threat]
             return True
         else:
             self.current_threat_id = None
-            self.current_threat_pos = None
+            #self.current_threat_pos = None
             return False
 
     def at_shoot_distance(self):
@@ -266,7 +271,7 @@ class LWFSM:
 
         # Get the original position of the drone based on its ID
         squad_positions = self.manager.get_squad_setpoints()
-        setpoint = squad_positions[self.id - self.manager.num_lm] # TODO this is very bad
+        setpoint = squad_positions[self.id - self.manager.env.num_lm] # TODO this is very bad
         self.current_setpoint = setpoint
 
         # Send the setpoint to the drone to move it back to formation
@@ -278,9 +283,10 @@ class LWFSM:
         """
 
         lw_position = self.manager.env.drone_positions[self.id]
+        current_threat_pos = self.manager.env.drone_positions[self.current_threat_id]
 
         # Calculate the direction vector from the LW to the threat
-        direction_vector = self.current_threat_pos - lw_position
+        direction_vector = current_threat_pos - lw_position
 
         # Calculate the halfway point
         halfway_point = lw_position + direction_vector
@@ -314,11 +320,12 @@ class LWFSM:
                 hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.max_velocity, 0.05)
 
                 # Determine if the shot hits
-                hit = np.random.random() < hit_probability
+                shot_outcome = np.random.random()
+                hit = shot_outcome < hit_probability
                 self.gun_loaded = False
                 self.last_shot_time = self.manager.aviary.elapsed_time
 
-                print(f'LW {self.id} {"hit" if hit else False} lm {self.current_threat_id} {self.manager.aviary.elapsed_time=}')
+                print(f'LW {self.id} {"hit" if hit else "misses"} lm {self.current_threat_id} {self.manager.aviary.elapsed_time=}')
                 if hit:
                     #print(f'Drone {self.id} hit threat {self.current_threat_id}!')
                     # Disarm the target drone if hit
@@ -328,7 +335,7 @@ class LWFSM:
                     #     self.manager.env.armed_uav_types.pop(self.current_threat_id)
 
                     self.current_threat_id = None
-                    self.current_threat_pos = None
+                    #self.current_threat_pos = None
 
                     return True
                 else:

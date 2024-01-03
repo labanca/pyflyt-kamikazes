@@ -292,10 +292,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         """Computes the termination, truncation, and reward of the current timestep."""
         term, trunc, reward, info = super().compute_base_term_trunc_reward_info_by_id(agent_id)
 
-        #self._compute_agent_states()
-
-        # don't recompute if we've already done it
-
         self._compute_engagement_rewards(agent_id)
 
         reward += self.rewards[agent_id]
@@ -361,34 +357,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             )
 
 
-    def compute_engagements(self):
-
-        for ag in self.agents:
-            ag_id = self.agent_name_mapping[ag]
-
-            if self.manager.downed_lm[ag_id]:
-                self.rew[ag] -= 10
-                self.term[ag] |= True
-                self.trun[ag] |= True
-                self.inf[ag]['downed'] = True
-
-            if self.term[ag] or self.trun[ag]:
-                self.disarm_drone(ag_id)
-                collisions_ids = self.get_collision_ids(ag_id)
-
-                for id in collisions_ids:
-                    # if self.drone_classes[id] == 'lw':
-                    self.disarm_drone(id)
-                    if self.drone_id_mapping[id] in self.targets:  # avoid double removing in the same iteration
-                        self.targets.remove(self.drone_id_mapping[id])
-                    if self.drone_classes[id] == 'lw':
-                        pass
-
-
-
-
-
-
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Computes the rotation matrix and forward vector of an aircraft given its orientation.
@@ -426,7 +394,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
 
-
     def print_rewards(self, agent_id, **kargs):
         for k,v in kargs.items():
             print(f'{agent_id} {k} = {v}')
@@ -454,8 +421,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             # Write the data
             for step_data in self.rewards_data:
                 writer.writerow(step_data)
-
-
 
     def plot_rewards_data(self,filename):
         import pandas as pd

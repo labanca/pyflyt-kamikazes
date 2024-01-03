@@ -28,9 +28,9 @@ class MAQuadXBaseEnv(ParallelEnv):
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
         flight_dome_size: float = 10.0,
-        max_duration_seconds: float = 10.0,
+        max_duration_seconds: float = 20.0,
         angle_representation: str = "euler",
-        agent_hz: int = 15,
+        agent_hz: int = 30,
         render_mode: None | str = None,
         seed: int = None,
         num_lm: int = 1,
@@ -131,8 +131,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.spawn_settings = spawn_settings
         self.seed = seed
         self.num_drones = len(start_pos)
-        self.num_lm = num_lm #self.spawn_settings['num_lm']
-        self.num_lw = num_lw #self.spawn_settings['num_lw']
+        self.num_lm = self.spawn_settings['num_lm'] if spawn_settings else num_lm
+        self.num_lw = self.spawn_settings['num_lw'] if spawn_settings else num_lw
         self.formation_center = formation_center
         self.lethal_distance = 1
         self.lethal_angle = 0.1
@@ -283,7 +283,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.rew_speed_magnitude = 0.0
         self.rew_near_engagement = 0.0
         self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
-
 
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
@@ -569,13 +568,13 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.save_step_data(ag)
 
             # increment step count and cull dead agents for the next round
-            self.step_count += 1
-            self.agents = [
-                agent
-                for agent in self.agents
-                if not (terminations[agent] or truncations[agent])
-            ]
-            self.update_control_lists()
+        self.step_count += 1
+        self.agents = [
+            agent
+            for agent in self.agents
+            if not (terminations[agent] or truncations[agent])
+        ]
+        self.update_control_lists()
 
         # all targets destroyed, End.
         if self.targets == []:
@@ -644,14 +643,14 @@ class MAQuadXBaseEnv(ParallelEnv):
         np_random = np.random.RandomState(seed=seed)
         lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_center_bounds),
                                np.random.uniform(-lw_center_bounds, lw_center_bounds),
-                               np.random.uniform(min_z, lw_spawn_radius + min_z)]
+                               np.random.uniform(min_z, lw_center_bounds + min_z)]
 
         start_pos_lw = LWManager.generate_formation_pos(lw_formation_center, num_lw, lw_spawn_radius)
         start_orn_lw = np.zeros_like(start_pos_lw)
 
         lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_center_bounds),
-                               np.random.uniform(-lm_center_bounds, lm_center_bounds),
-                               np.random.uniform(min_z, lm_spawn_radius + min_z)]
+                           np.random.uniform(-lm_center_bounds, lm_center_bounds),
+                           np.random.uniform(min_z, lm_center_bounds + min_z)]
 
         start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_spawn_radius,
                                                                    lm_spawn_center, lm_spawn_radius, num_lm, min_z)
@@ -677,7 +676,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
             # Check if the generated coordinates are outside the exclusion area of the lw formation
             lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-            if lm_distance > lw_spawn_radius * 2:
+            if lm_distance > lw_spawn_radius * 3:
                 lm_coordinates.append([x, y, z])
 
         return np.array(lm_coordinates)
@@ -1073,9 +1072,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         }
         self.rewards_data.append(step_data)
 
-
-    def drone_alive(self, drone_id):
-
+    def uav_alive(self, drone_id):
         if drone_id in self.armed_uavs.keys():
             return True
         else:

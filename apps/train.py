@@ -39,8 +39,8 @@ def train_butterfly_supersuit(
     env = ss.pettingzoo_env_to_vec_env_v1(env )
 
 
-    num_vec_envs = 16 #8
-    num_cpus = 16 #(os.cpu_count() or 1)
+    num_vec_envs = 12 #8
+    num_cpus = 12 #(os.cpu_count() or 1)
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
 
@@ -183,7 +183,7 @@ spawn_settings = dict(
     min_z=1.0,
     seed=None,
     num_lw=3,
-    num_lm=6,
+    num_lm=12,
 )
 
 if __name__ == "__main__":
@@ -198,17 +198,17 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
+    env_kwargs['max_duration_seconds'] = 20
 
     #seed = 42
-    train_desc = """training from zero with FSM om obs.shape 42. Trying 6 lm and 3 lw. Collision range 0.5m. trying the trick of past - current_distance * 5 (wasn't * 10 at end of this reward, was *1)
+    train_desc = """Collision revamped and range 0.5m. agent hz 30. min dist spawm LM from 3 * lw_spawn_radius.
 
-            # reward for closing the distance
+                        # reward for closing the distance
             self.rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5,
-                a_min=-10.0,
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+                a_min=0.0,
                 a_max=None,
-            ) * 10
-            #* self.chasing[agent_id][target_id]
+            ) * self.chasing[agent_id][target_id]
 
 
             # reward for engaging the enemy
@@ -230,23 +230,21 @@ if __name__ == "__main__":
 
             # reward for maintaning linear velocities.
             self.rew_speed_magnitude =(
-                    (self.current_magnitude[agent_id]**2)
-
+                    (self.current_magnitude[agent_id])**2
                     * self.approaching[agent_id][target_id]
-
+                    * 1.0
             )
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-
+                    + self.rew_engaging_enemy
                     + self.rew_speed_magnitude
-
+                    + self.rew_near_engagement
             )
-
 """
 
     #Train a model
-    train_butterfly_supersuit(env_fn, steps=30_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=4_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
