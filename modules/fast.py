@@ -18,13 +18,13 @@ spawn_settings = dict(
     lm_spawn_radius=10,
     min_z=1.0,
     seed=None,
-    num_lw=1,
+    num_lw=2,
     num_lm=2,
 )
 
 
 env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [4, 4, 1], [-5,-5,5] [0, 0, 1]  ])
+env_kwargs['start_pos'] = np.array([ [4, 4, 1], [-5,-5,5], [0, 0, 1], [7,7,7]  ])
 env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['formation_center'] = np.array([0, 0, 1])
 env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
@@ -32,6 +32,7 @@ env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = None
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
+env_kwargs['max_duration_seconds'] = 10
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
@@ -50,7 +51,7 @@ while env.agents:
     #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
 
-    actions['agent_0'] = np.array([-2, -2, 0, 0.3]) # np.array([i, i, 0, 0.123*i])
+    actions['agent_0'] = np.array([-3, -3, 0, 0.5]) # np.array([i, i, 0, 0.123*i])
     actions['agent_1'] = np.array([0, 0, 0, 0])
     #actions['agent_2'] = np.array([-4*i, 0, 0, 0.3*i])
     #actions['agent_3'] = np.array([0, 0, 0, 0])

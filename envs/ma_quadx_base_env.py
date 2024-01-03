@@ -322,6 +322,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
 
+
+
         self.squad_id_mapping = {}
 
         # rebuild the environment
@@ -333,6 +335,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             drone_options=drone_options,
             seed=seed,
         )
+
+        self.agent_forward_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2)
 
         self.change_visuals()
         self.init_debug_vectors()
@@ -536,6 +540,11 @@ class MAQuadXBaseEnv(ParallelEnv):
             self._compute_agent_states()
             self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
             self.lw_manager.update(stand_still=False)
+
+
+            self.agent_forward_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1], self.drone_positions[0] + self.ground_velocities[0],
+                                         lineWidth=2, replaceItemUniqueId=self.agent_forward_line)
+            print(self.chasing[0][2])
 
             # update reward, term, trunc, for each agent
             for ag in self.agents:

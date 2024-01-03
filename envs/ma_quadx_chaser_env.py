@@ -169,7 +169,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.linear_velocities = self.attitudes[:, 2]
         self.drone_positions = self.attitudes[:, 3]
 
-        self.relative_lin_velocities = self.attitudes[:, 2][:, np.newaxis, :] - self.attitudes[:, 2]
+        self.relative_lin_velocities = self.attitudes[:, 2][:, np.newaxis, :] - self.attitudes[:, 2] #wrong
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # rotation matrix and forward vectors
@@ -184,20 +184,23 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         dot_products = np.sum(self.separation * self.relative_lin_velocities, axis=-1)
         norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.separation)
         cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
-        self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
+        self.current_angles = np.arccos(np.clip(cosines, -1, 1))
 
 
         # opponent velocity is relative to ours in our body frame
+        # TODO check with draw
         ground_velocities: np.ndarray = (
             rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
         ).reshape(self.attitudes.shape[0], 3)
+
+        self.ground_velocities = ground_velocities
 
 
         # angles again, trying with ground velocities
         dot_products = np.sum(self.separation * ground_velocities, axis=-1)
         norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(ground_velocities)
         cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
-        self.current_angles = np.arccos(np.clip(cosines, -1, 1))
+        self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
 
 
 
@@ -316,27 +319,13 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 a_max=None,
             ) * self.chasing[agent_id][target_id]
 
+            self.rew_close_to_target = 1 / (self.current_distance[agent_id][target_id] + 0.1)   #if the 1 is to hight the kamikazes will circle the enemy. try a
 
-            # reward for engaging the enemy
-            self.rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
-                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (
-                    self.chasing[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * 1.0
-                )
-
-            # reward for maintaning linear velocities.
-            self.rew_speed_magnitude =(
-                    (self.current_rel_vel_magnitude[agent_id][target_id])**2
-                    * self.chasing[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * 1.0
-            )
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-                    + self.rew_engaging_enemy
-                    + self.rew_speed_magnitude
+                    + self.rew_close_to_target * 1.0 # regulations
+
 
             )
 
