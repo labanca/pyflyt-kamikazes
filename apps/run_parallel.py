@@ -1,25 +1,25 @@
-from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from stable_baselines3 import PPO
 import numpy as np
 import time
 
-model = PPO.load('models/ma_quadx_hover_20240102-072858.zip')
+model = PPO.load('models/ma_quadx_hover_20231227-205852.zip')
 #model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
 seed=None
 
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
-    lw_center_bounds=10.0,
+    lw_center_bounds=5.0,
     lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
+    lm_spawn_radius=5.0,
     min_z=1.0,
     seed=None,
-    num_lw=10,
-    num_lm=20,
+    num_lw=3,
+    num_lm=6,
 )
 env_kwargs = {}
-env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
+env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
 env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
                                   + spawn_settings['lw_center_bounds'] + spawn_settings['lm_spawn_radius'] )   # dome size 50% bigger than the spawn radius
 env_kwargs['seed'] = seed
@@ -27,7 +27,7 @@ env_kwargs['spawn_settings'] = spawn_settings
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
 
-env = MAQuadXHoverEnv(render_mode='human', **env_kwargs)
+env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}

@@ -50,7 +50,7 @@ class ThreatChaseState(State):
             elif self.drone_fsm.at_shoot_distance():
                 self.drone_fsm.change_state('ShootThreatState')
 
-            elif self.drone_fsm.distance_to_threat() < 5:
+            elif self.drone_fsm.distance_to_threat() < 6.0:
                 self.drone_fsm.chase_threat()
 
             else:
@@ -59,6 +59,7 @@ class ThreatChaseState(State):
     def exit(self):
         #print(f"Drone {self.drone_fsm.id} is exiting threat chase state.")
         self.drone_fsm.chasing = False
+
 
 class ShootThreatState(State):
     def enter(self):
@@ -73,19 +74,15 @@ class ShootThreatState(State):
             if self.drone_fsm.shoot_target():
                 self.drone_fsm.change_state('GoToFormationState')
 
-        elif self.drone_fsm.distance_to_threat() > 6:
+        elif self.drone_fsm.distance_to_threat() > 6.0:
             self.drone_fsm.change_state('GoToFormationState')
         else:
             self.drone_fsm.change_state('ChaseThreatState')
 
-        # elif not self.drone_fsm.reloading:
-        #     #print(f"Drone {self.drone_fsm.id} gun is not loaded.")
-        #     self.drone_fsm.reloading = True
-
-
     def exit(self):
         #print(f"Drone {self.drone_fsm.id} is exiting shoot threat state.")
         self.drone_fsm.shooting = False
+
 
 class GoToFormationState(State):
     def enter(self):
@@ -323,7 +320,7 @@ class LWFSM:
 
                 # Calculate hit probability based on velocity
                 #target_drone_velocity = self.manager.env.attitudes[self.current_threat_id][2, :]
-                velocity_magnitude = self.manager.env.current_magnitude[self.current_threat_id] #np.linalg.norm(target_drone_velocity)
+                velocity_magnitude = self.manager.env.current_rel_vel_magnitude[self.current_threat_id][self.id]
                 max_hit_probability = 0.9
                 hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.max_velocity, 0.05)
 
@@ -333,7 +330,7 @@ class LWFSM:
                 self.gun_loaded = False
                 self.last_shot_time = self.manager.aviary.elapsed_time
 
-                print(f'LW {self.id} {"hit" if hit else "misses"} lm {self.current_threat_id} {self.manager.aviary.elapsed_time=}')
+               # print(f'LW {self.id} {"hit" if hit else "misses"} lm {self.current_threat_id} {self.manager.aviary.elapsed_time=}')
                 if hit:
                     #print(f'Drone {self.id} hit threat {self.current_threat_id}!')
                     # Disarm the target drone if hit

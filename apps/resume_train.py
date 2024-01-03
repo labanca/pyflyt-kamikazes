@@ -18,7 +18,7 @@ from stable_baselines3.common.utils import get_device
 from gymnasium.utils import EzPickle
 from pettingzoo.utils import parallel_to_aec
 
-from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 
 
 def train_butterfly_supersuit(
@@ -177,10 +177,10 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     return avg_reward_per_game
 
 
-class EZPEnv(EzPickle, MAQuadXHoverEnv):
+class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
         EzPickle.__init__(self, *args, **kwargs)
-        MAQuadXHoverEnv.__init__(self, *args, **kwargs)
+        MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
 seed=None
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
                                       spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
     env_kwargs['seed'] = seed

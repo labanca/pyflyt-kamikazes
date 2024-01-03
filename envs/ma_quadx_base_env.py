@@ -301,6 +301,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.past_magnitude = np.zeros(self.num_drones, dtype=np.float64)
         self.current_magnitude = np.zeros(self.num_drones, dtype=np.float64)
 
+        self.previous_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
+        self.current_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
+
         self.forward_vecs = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.separation = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
 
@@ -554,7 +557,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_acc_rew[ag] += rew
                 self.current_inf[ag] = {**infos[ag], **info}
                 self.current_obs[ag] = observations[ag]
-                self.save_step_data(ag)
+                #self.save_step_data(ag)
 
         # increment step count and cull dead agents for the next round
         self.step_count += 1
@@ -1043,6 +1046,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             "rew_near_engagement": self.rew_near_engagement,
             "acc_rewards": self.current_acc_rew[agent],
             "vel_angles": self.current_vel_angles[agent_id][target_id],
+            "rel_vel_magnitudade": self.current_rel_vel_magnitude[agent_id][target_id],
             "approaching": int(self.approaching[agent_id][target_id]),
             "chasing": int(self.chasing[agent_id][target_id]),
             "in_range": int(self.in_range[agent_id][target_id]),

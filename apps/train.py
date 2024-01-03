@@ -22,7 +22,7 @@ from stable_baselines3.common.utils import get_device
 from gymnasium.utils import EzPickle
 from pettingzoo.utils import parallel_to_aec
 
-from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 
 
 def train_butterfly_supersuit(
@@ -47,7 +47,7 @@ def train_butterfly_supersuit(
     device = get_device('cuda')
     batch_size = 512 # 512 davi
     lr = 1e-3
-    nn_t = [256, 256, 256]
+    nn_t = [128, 128, 128]
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
     )
@@ -167,30 +167,30 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     return avg_reward_per_game
 
 
-class EZPEnv(EzPickle, MAQuadXHoverEnv):
+class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
         EzPickle.__init__(self, *args, **kwargs)
-        MAQuadXHoverEnv.__init__(self, *args, **kwargs)
+        MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
 seed=None
 
 spawn_settings = dict(
-    lw_center_bounds=10.0,
-    lm_center_bounds=10.0,
+    lw_center_bounds=5.0,
+    lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=5,
+    lm_spawn_radius=5.0,
     min_z=1.0,
     seed=None,
-    num_lw=3,
-    num_lm=12,
+    num_lw=6,
+    num_lm=6,
 )
 
 if __name__ == "__main__":
     env_fn = EZPEnv
 
     env_kwargs = {}
-    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXHoverEnv.generate_start_pos_orn(**spawn_settings)
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
                                       + spawn_settings['lw_center_bounds'] + spawn_settings[
                                           'lm_spawn_radius'])
@@ -198,35 +198,17 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 20
+    env_kwargs['max_duration_seconds'] = 15
 
     #seed = 42
-    train_desc = """Collision revamped and range 0.5m. agent hz 30. min dist spawm LM from 3 * lw_spawn_radius.
+    train_desc = """Collision revamped and range 0.5m. 15 seg epis. agent hz 30. min dist spawm LM from 3 * lw_spawn_radius.
 
-                        # reward for closing the distance
+           # reward for closing the distance
             self.rew_closing_distance = np.clip(
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                a_min=0.0,
+                a_min=-10.0,
                 a_max=None,
-            ) * self.chasing[agent_id][target_id]
-
-
-            # reward for engaging the enemy
-            self.rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
-                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (
-                    self.chasing[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * 1.0
-                )
-
-            # # reward for progressing to engagement
-            self.rew_near_engagement = (
-                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
-                    * 100.0
-                    * self.in_range[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * self.chasing[agent_id][target_id]
-            )
+            ) 
 
             # reward for maintaning linear velocities.
             self.rew_speed_magnitude =(
@@ -237,14 +219,13 @@ if __name__ == "__main__":
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-                    + self.rew_engaging_enemy
                     + self.rew_speed_magnitude
-                    + self.rew_near_engagement
+
             )
 """
 
     #Train a model
-    train_butterfly_supersuit(env_fn, steps=4_000_000,train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=30_000_000,train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

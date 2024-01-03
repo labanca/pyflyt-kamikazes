@@ -25,7 +25,7 @@ def _np_cross(x, y) -> np.ndarray:
 
 
 
-class MAQuadXHoverEnv(MAQuadXBaseEnv):
+class MAQuadXChaserEnv(MAQuadXBaseEnv):
     """Simple Multiagent Hover Environment.
 
     Actions are vp, vq, vr, T, ie: angular rates and thrust.
@@ -109,7 +109,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 21,),
+            shape=(self.combined_space.shape[0] + 19,),
             dtype=np.float64,
         )
 
@@ -149,60 +149,63 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         Returns:
             None:
         """
+        # self.aviary.all_states returns a `num_drones` list of (4, 3) arrays, where each element in the list corresponds to the i-th drone state.
+        #
+        # Similar to the `state` property, the states contain information corresponding to:
+        #     - `state[0, :]` represents body frame angular velocity
+        #     - `state[1, :]` represents ground frame angular position
+        #     - `state[2, :]` represents body frame linear velocity
+        #     - `state[3, :]` represents ground frame linear position
+
 
         self.past_magnitude = self.current_magnitude.copy()
         self.previous_distance = self.current_distance.copy()
         self.previous_angles = self.current_angles.copy()
         self.previous_vel_angles = self.current_vel_angles
+        self.previous_rel_vel_magnitude = self.current_rel_vel_magnitude
 
         # get the states of all drones
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
         self.linear_velocities = self.attitudes[:, 2]
         self.drone_positions = self.attitudes[:, 3]
-        self.current_magnitude = [np.linalg.norm(action) for action in self.current_actions]
 
+        self.relative_lin_velocities = self.attitudes[:, 2][:, np.newaxis, :] - self.attitudes[:, 2]
+        self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
+
+        # rotation matrix and forward vectors
         rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
-        self.forward_vecs_repeated = np.repeat(self.forward_vecs[np.newaxis, :, :], len(self.attitudes), axis=0)
 
-        # compute the vectors of each drone to each drone
+
+        # compute the separtion vectors and distance of each drone to each drone
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
-
-        # Compute the norm along the last axis for each pair of drones
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
-        #distance_vector = self.drone_positions[target_id] - self.drone_positions[agent_id]
-        #velocity_vector = self.aviary.state(agent_id)[2]
-
-        # dot_prod = np.dot(self.separation, self.linear_velocities)
-        #                     #/ (np.linalg.norm(distance_vector) * np.linalg.norm(velocity_vector))
-        # nor_sep_vel = np.linalg.norm(self.separation)* np.linalg.norm(self.linear_velocities)
-        # #self.cosine_similarities = np.divide(dot_prod, nor_sep_vel, where=nor_sep_vel != 0)
-        #
-        # cosine_similarities = np.einsum('ijk,lk->ijl', self.separation, self.linear_velocities) /(np.linalg.norm(self.separation, axis=2) * np.linalg.norm(self.linear_velocities, axis=1))
-
-        # compute angles between trajectory and velocity vectors
-        dot_products = np.sum(self.separation * self.linear_velocities, axis=-1)
-        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.linear_velocities)
+        # compute angles between separation and velocity vectors
+        dot_products = np.sum(self.separation * self.relative_lin_velocities, axis=-1)
+        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.separation)
         cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
         self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
 
 
-        # compute engagement angles (foward vectors angles?)
-        x1 = np.sum(self.separation * self.forward_vecs, axis=-1)
-        x2 = self.current_distance
-        c1 = np.divide(x1, x2, where=x2 != 0)
-        self.current_angles = np.arccos(np.clip(c1,-1.0,1.0))
+        # opponent velocity is relative to ours in our body frame
+        ground_velocities: np.ndarray = (
+            rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
+        ).reshape(self.attitudes.shape[0], 3)
+
+
+        # angles again, trying with ground velocities
+        dot_products = np.sum(self.separation * ground_velocities, axis=-1)
+        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(ground_velocities)
+        cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
+        self.current_angles = np.arccos(np.clip(cosines, -1, 1))
+
+
 
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
-        self.in_range = self.current_distance < self.lethal_distance # lethal distance = 0.15
-        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # I've tryed  2.0
+        self.in_range = self.current_distance < self.lethal_distance # lethal distance = 1.0
+        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
 
-        #seems wrong
-        self.heading_towards_target = np.logical_and(
-                            self.current_angles < (np.pi / 2.0),
-                            (np.sum(self.separation * self.linear_velocities, axis = -1) > 0)
-        )
 
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
@@ -237,7 +240,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # target_attitude = self.aviary.state(target_id)
         target_attitude = self.compute_attitude_by_id(target_id)
         ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quaternion_target = target_attitude
-        hit_probability = max(0.9 - self.current_magnitude[agent_id]/self.manager.max_velocity, 0.05)
+        hit_probability = max(0.9 - self.current_rel_vel_magnitude[agent_id][target_id] /self.lw_manager.max_velocity, 0.05)
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -256,18 +259,18 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             return np.array(
                 [
                     *ang_vel,
-                    *np.array(quaternion),
+                    *ang_pos,
                     *lin_vel,
                     *lin_pos,
                     *aux_state,
                     *self.past_actions[agent_id],
-                    self.current_magnitude[agent_id],
+                    self.current_rel_vel_magnitude[agent_id][target_id],
 
                     *ally_lin_vel,
                     *ally_lin_pos,
 
                     *ang_vel_target,
-                    *np.array(quaternion_target),
+                    *ang_pos_target,
                     *lin_vel_target,
                     *lin_pos_target,
                     hit_probability,
@@ -300,9 +303,8 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         # reset rewards
         self.rewards[agent_id] *= 0.0
         ag = self.drone_id_mapping[agent_id]
-
         target_id = self.find_nearest_lw(agent_id)
-        self.current_target_id[agent_id] = target_id
+        self.current_target_id[agent_id] = target_id # stores targets
 
         # sparse reward computation
         if not self.sparse_reward:
@@ -310,7 +312,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                a_min=0.0,
+                a_min=-10.0,
                 a_max=None,
             ) * self.chasing[agent_id][target_id]
 
@@ -323,19 +325,10 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     * 1.0
                 )
 
-            # # reward for progressing to engagement
-            self.rew_near_engagement = (
-                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
-                    * 100.0
-                    * self.in_range[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * self.chasing[agent_id][target_id]
-            )
-
             # reward for maintaning linear velocities.
             self.rew_speed_magnitude =(
-                    (self.current_magnitude[agent_id])**2
-                    #* self.chasing[agent_id][target_id]
+                    (self.current_rel_vel_magnitude[agent_id][target_id])**2
+                    * self.chasing[agent_id][target_id]
                     * self.approaching[agent_id][target_id]
                     * 1.0
             )
@@ -344,9 +337,8 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     self.rew_closing_distance
                     + self.rew_engaging_enemy
                     + self.rew_speed_magnitude
-                    + self.rew_near_engagement
-            )
 
+            )
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -400,7 +392,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = ["agent_id", "elapsed_time",
                           "rew_closing_distance", "rew_engaging_enemy", "rew_speed_magnitude", "rew_near_engagement", "acc_rewards",
-                          "vel_angles", "approaching", "chasing", "in_range", "current_term",
+                          "vel_angles", "rel_vel_magnitudade", "approaching", "chasing", "in_range", "current_term",
                           "info[downed]", "info[exploded_target]", "info[exploded_ally]",  "info[crashes]", "info[ally_collision]",
                             "info[mission_complete]", "info[out_of_bounds]", "info[timeover]"
                           ]
@@ -455,6 +447,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         plt.plot(agent_data['elapsed_time'], agent_data['rew_engaging_enemy'], label='Engaging Enemy')
         plt.plot(agent_data['elapsed_time'], agent_data['rew_speed_magnitude'], label='Speed Magnitude')
         plt.plot(agent_data['elapsed_time'], agent_data['rew_near_engagement'], label='Near Engagement')
+        plt.plot(agent_data['elapsed_time'], agent_data['rel_vel_magnitudade'], label='rel_vel_magnitudade')
         #plt.plot(agent_data['elapsed_time'], agent_data['vel_angles'], label='vel_angles')
         #plt.plot(agent_data['elapsed_time'], agent_data['chasing'], label='chasing')
 
