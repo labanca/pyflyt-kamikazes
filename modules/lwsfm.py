@@ -66,12 +66,17 @@ class ShootThreatState(State):
         pass
 
     def execute(self):
+        if self.drone_fsm.current_threat_id is None:
+            self.drone_fsm.change_state('GoToFormationState')
 
-        if self.drone_fsm.current_threat_id is not None:
+        elif self.drone_fsm.at_shoot_distance():
             if self.drone_fsm.shoot_target():
                 self.drone_fsm.change_state('GoToFormationState')
-        else:
+
+        elif self.drone_fsm.distance_to_threat() > 6:
             self.drone_fsm.change_state('GoToFormationState')
+        else:
+            self.drone_fsm.change_state('ChaseThreatState')
 
         # elif not self.drone_fsm.reloading:
         #     #print(f"Drone {self.drone_fsm.id} gun is not loaded.")
@@ -227,6 +232,9 @@ class LWFSM:
             if self.manager.downed_lm[self.current_threat_id]:
                 self.current_threat_id = None
                 #self.current_threat_pos = None
+
+        if self.current_threat_id not in self.manager.env.armed_uavs:
+            self.current_threat_id = None
 
     def distance_to_threat(self):
 

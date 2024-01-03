@@ -222,7 +222,6 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
         target_id = self.find_nearest_lw(agent_id)
         near_ally_id = self.find_nearest_lm(agent_id, exclude_self=True)
 
-
         raw_state = self.compute_attitude_by_id(agent_id)
         aux_state = self.compute_auxiliary_by_id(agent_id)
         ang_vel, ang_pos, lin_vel, lin_pos, quaternion = raw_state
@@ -235,18 +234,10 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
             ally_lin_vel = np.array([False,False,False])
             ally_lin_pos = np.array([False,False,False])
 
-
-
         # target_attitude = self.aviary.state(target_id)
         target_attitude = self.compute_attitude_by_id(target_id)
         ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quaternion_target = target_attitude
-        try:
-            target_last_shot_time = self.manager.squad[self.squad_id_mapping[target_id]].last_shot_time
-
-        except:
-            target_last_shot_time = -1
-
-
+        hit_probability = max(0.9 - self.current_magnitude[agent_id]/self.manager.max_velocity, 0.05)
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -279,7 +270,7 @@ class MAQuadXHoverEnv(MAQuadXBaseEnv):
                     *np.array(quaternion_target),
                     *lin_vel_target,
                     *lin_pos_target,
-                    target_last_shot_time,
+                    hit_probability,
                 ]
             )
         else:

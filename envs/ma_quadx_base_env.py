@@ -534,23 +534,12 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
             self.lw_manager.update(stand_still=False)
 
-            # Debug, draw vel forward and trajectory vectors
-            #self.draw_debug_vectors()
-
-            # # Avoid losing detect a collision with aviary steps without a RL step. Do not consider ground collision
-            # if any([self.aviary.contact_array[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
-            #     break
-            #
-            # if any([self.collision_matrix[self.aviary.drones[self.agent_name_mapping[agent]].Id][1:].sum() > 0 for agent in self.agents]):
-            #     break
-
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
 
                 # compute term trunc reward
                 term, trunc, rew, info = self.compute_term_trunc_reward_info_by_id(ag_id)
-                #self.compute_collisions(ag)
 
                 terminations[ag] |= term
                 truncations[ag] |= trunc
@@ -567,7 +556,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_obs[ag] = observations[ag]
                 self.save_step_data(ag)
 
-            # increment step count and cull dead agents for the next round
+        # increment step count and cull dead agents for the next round
         self.step_count += 1
         self.agents = [
             agent
@@ -833,7 +822,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         return self.forward_debug_line
 
     def find_nearest_lw(self, agent_id: int) -> int:
-        # Assuming compute_observation_by_id has been called to update self.current_distance
+
         distances = self.current_distance[agent_id, :]
 
         self.update_control_lists()
@@ -852,7 +841,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         return nearest_lw_index
 
     def find_nearest_lm(self, agent_id: int, exclude_self = False):
-        # Assuming compute_observation_by_id has been called to update self.current_distance
 
         self.update_control_lists()
 
@@ -862,7 +850,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm' and key != agent_id])
         else:
             lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
-
 
         if not len(lm_indices) > 0:
             if self.drone_classes == 'lw':
