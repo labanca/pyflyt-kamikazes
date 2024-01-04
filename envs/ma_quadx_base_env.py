@@ -1,13 +1,11 @@
 """Base Multiagent QuadX Environment."""
-from __future__ import  annotations
+from __future__ import annotations
 
 import math
 from copy import deepcopy
 from typing import Any
-from pprint import pprint
 
 import numpy as np
-import pandas as pd
 import pybullet as p
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
@@ -38,7 +36,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
-        black_death: bool = False
+        reward_coef: float = 1.0,
+        lw_stand_still: bool = False
     ):
         """__init__.
 
@@ -136,6 +135,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.formation_center = formation_center
         self.lethal_distance = 1
         self.lethal_angle = 0.1
+        self.reward_coef = reward_coef
+        self.lw_stand_still = lw_stand_still
 
         self.rewards_data = []
         self.rew_log = [
@@ -337,9 +338,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         )
 
         self.agent_forward_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2)
+        self.agent_sep_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[0, 1, 0],  lineWidth=2)
 
         self.change_visuals()
-        self.init_debug_vectors()
+        #self.init_debug_vectors()
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -410,11 +412,7 @@ class MAQuadXBaseEnv(ParallelEnv):
     def _compute_agent_states(self) -> None:
         """compute_observation_by_id.
 
-        Args:
-            agent_id (int): agent_id
 
-        Returns:
-            Any:
         """
         raise NotImplementedError
 
@@ -470,13 +468,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             if not info.get("exploded_target", False): # avoid misscounting when exploded the same target
                 info["exploded_by_ally"] = True
             term |= True
-
-        # # being near of other lm without
-        # if 'lm' in midrange_collisions:
-        #     reward -= 1.0
-        #     #info["exploded_ally"] = True
-        #     #term |= True
-        #     #trunc |= True
 
         return term, trunc, reward, info
 
@@ -538,13 +529,19 @@ class MAQuadXBaseEnv(ParallelEnv):
 
             self.aviary.step()
             self._compute_agent_states()
-            self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
-            self.lw_manager.update(stand_still=False)
+            if self.aviary.isConnected():  # avoid pybullet.error: Not connected to physics server.
+                self.collision_matrix = self.create_collision_matrix(distance_threshold=0.5)
+            self.lw_manager.update(stand_still=self.lw_stand_still)
 
 
-            self.agent_forward_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1], self.drone_positions[0] + self.ground_velocities[0],
-                                         lineWidth=2, replaceItemUniqueId=self.agent_forward_line)
-            print(self.chasing[0][2])
+            # self.agent_forward_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1], self.aviary.state(0)[-1] + self.ground_velocities[0],
+            #                              lineWidth=2, replaceItemUniqueId=self.agent_forward_line,  lineColorRGB=[1, 1, 1])
+            #
+            # self.agent_sep_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1],self.aviary.state(0)[-1] +  self.separation[1][0],
+            #                              lineWidth=2, replaceItemUniqueId=self.agent_sep_line,  lineColorRGB=[0, 1, 0.5])
+
+            #print(self.chasing[1])
+            #print(self.chasing[1][0])
 
             # update reward, term, trunc, for each agent
             for ag in self.agents:

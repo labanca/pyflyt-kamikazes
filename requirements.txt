@@ -7,6 +7,7 @@ stable_baselines3
 pandas
 matplotlib
 gymnasium
+tensorflow
 tensorboard
 
 

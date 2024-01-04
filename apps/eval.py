@@ -12,7 +12,7 @@ import time
 class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
         EzPickle.__init__(self, *args, **kwargs)
-        MAQuadXHoverEnv.__init__(self, *args, **kwargs)
+        MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 def eval(env_fn, n_eval_episodes: int = 100, num_vec_envs: int =1, model_name: str = '',
          render_mode: str | None = None, **kwargs):

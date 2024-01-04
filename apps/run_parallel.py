@@ -3,21 +3,23 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-model = PPO.load('models/ma_quadx_hover_20240103-103330.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240104-181840/ma_quadx_chaser-1000000.zip')
 #model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
 seed=None
 
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
-    lw_center_bounds=2.0,
-    lm_center_bounds=2.0,
+    lw_center_bounds=10.0,
+    lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=5.0,
+    lm_spawn_radius=10.0,
     min_z=1.0,
     seed=None,
-    num_lw=5,
-    num_lm=10,
+    num_lw=1,
+    num_lm=1,
 )
+
+
 env_kwargs = {}
 env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
 env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
@@ -27,6 +29,7 @@ env_kwargs['spawn_settings'] = spawn_settings
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
 env_kwargs['max_duration_seconds'] = 10
+env_kwargs['reward_coef'] = 1.0
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
@@ -44,7 +47,6 @@ while env.agents:
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
-    #print(f'{env.current_magnitude=}')
     if first_time == True:
         first_time = False
 

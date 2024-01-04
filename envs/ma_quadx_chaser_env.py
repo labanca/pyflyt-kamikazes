@@ -1,14 +1,12 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-
 import numpy as np
-import pandas as pd
+
 from gymnasium import spaces
 from typing import Any
 
-#from PyFlyt.pz_envs.quadx_envs.ma_quadx_base_env import MAQuadXBaseEnv
+
 from envs.ma_quadx_base_env import MAQuadXBaseEnv
 
 def _np_cross(x, y) -> np.ndarray:
@@ -44,7 +42,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
     metadata = {
         "render_modes": ["human"],
-        "name": "ma_quadx_hover",
+        "name": "ma_quadx_chaser",
 
     }
 
@@ -70,7 +68,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
-        black_death: bool = False,
+        reward_coef: float = 1.0,
+        lw_stand_still: bool = False,
     ):
         """__init__.
 
@@ -97,8 +96,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             num_lm=num_lm,
             num_lw=num_lw,
             formation_center=formation_center,
-            black_death=black_death
-
+            reward_coef=reward_coef,
+            lw_stand_still=lw_stand_still,
         )
 
 
@@ -149,14 +148,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         Returns:
             None:
         """
-        # self.aviary.all_states returns a `num_drones` list of (4, 3) arrays, where each element in the list corresponds to the i-th drone state.
-        #
-        # Similar to the `state` property, the states contain information corresponding to:
-        #     - `state[0, :]` represents body frame angular velocity
-        #     - `state[1, :]` represents ground frame angular position
-        #     - `state[2, :]` represents body frame linear velocity
-        #     - `state[3, :]` represents ground frame linear position
-
 
         self.past_magnitude = self.current_magnitude.copy()
         self.previous_distance = self.current_distance.copy()
@@ -175,8 +166,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         # rotation matrix and forward vectors
         rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
 
-
-        # compute the separtion vectors and distance of each drone to each drone
+        # compute the separation vectors and distance of each drone to each drone
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
@@ -185,7 +175,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.separation)
         cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
         self.current_angles = np.arccos(np.clip(cosines, -1, 1))
-
 
         # opponent velocity is relative to ours in our body frame
         # TODO check with draw
@@ -202,14 +191,10 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
         self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
 
-
-
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
         self.in_range = self.current_distance < self.lethal_distance # lethal distance = 1.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
-
-
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
@@ -220,9 +205,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         Returns:
             np.ndarray:
         """
-
-        # THIS IS THE COMPUTE_STATE
-        # get all the relevant things
 
         self.last_obs_time = self.aviary.elapsed_time
         target_id = self.find_nearest_lw(agent_id)
@@ -319,13 +301,14 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 a_max=None,
             ) * self.chasing[agent_id][target_id]
 
-            self.rew_close_to_target = 1 / (self.current_distance[agent_id][target_id] + 0.1)   #if the 1 is to hight the kamikazes will circle the enemy. try a
+            self.rew_close_to_target = 1 / (
+                self.current_distance[agent_id][target_id]
+                if self.current_distance[agent_id][target_id] > 0 else 0.1 )   #if the 1 is to hight the kamikazes will circle the enemy. try a
 
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-                    + self.rew_close_to_target * 1.0 # regulations
-
+                    + self.rew_close_to_target * self.reward_coef # regularizations
 
             )
 

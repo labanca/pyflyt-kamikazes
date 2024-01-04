@@ -40,27 +40,25 @@ class HParamCallback(BaseCallback):
         return True
 
 
-model = A2C("MlpPolicy", "CartPole-v1", tensorboard_log="runs/", verbose=1)
-model.learn(total_timesteps=int(5e4), callback=HParamCallback())
+
 # Define your custom callback class
 class TensorboardCallback(BaseCallback):
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=0,):
         super(TensorboardCallback, self).__init__(verbose)
-        self.best_mean_reward = -np.inf
+
+
 
 
     def _on_step(self) -> bool:
-        # Log additional tensor
-        self.logger.record("dummy_value", 42)
-
-        # Log the current mean reward to Tensorboard
-        x, y = ts2xy(load_results(self.training_env), 'timesteps')
-        if len(x) > 0:
-            mean_reward = np.mean(y[-100:])
-            if mean_reward > self.best_mean_reward:
-                self.best_mean_reward = mean_reward
-                self.logger.record("best_mean_reward", float(mean_reward))
-
+        # self.logger.record('reward', self.CustomEnvironment1.get_attr('total_reward')[0])
+        # ep_rewards1 = self.locals['infos']['Seeker1'][0]
+        # ep_rewards2 = self.locals['infos']['Seeker2'][0]
+        ep_rewards1 = self.locals['rewards'][0]
+        ep_rewards2 = self.locals['rewards'][1]
+        self.logger.record("rewards1", ep_rewards1)
+        self.logger.record("rewards2", ep_rewards2)
+        if (self.num_timesteps % 80 == 0):
+            self.logger.dump(self.num_timesteps)
         return True
 
     def _on_training_start(self) -> None:
@@ -89,3 +87,23 @@ class TensorboardCallback(BaseCallback):
         This event is triggered before exiting the `learn()` method.
         """
         pass
+
+class TensorboardCallback(BaseCallback):
+    """
+    Custom callback for plotting additional values in tensorboard.
+    """
+
+    def init(self, verbose=0):
+        super().init(verbose)
+
+    def _on_step(self) -> bool:
+        # self.logger.record('reward', self.CustomEnvironment1.get_attr('total_reward')[0])
+        # ep_rewards1 = self.locals['infos']['Seeker1'][0]
+        # ep_rewards2 = self.locals['infos']['Seeker2'][0]
+        ep_rewards1 = self.locals['rewards'][0]
+        ep_rewards2 = self.locals['rewards'][1]
+        self.logger.record("rewards1", ep_rewards1)
+        self.logger.record("rewards2", ep_rewards2)
+        if (self.num_timesteps % 80 == 0):
+            self.logger.dump(self.num_timesteps)
+        return True
