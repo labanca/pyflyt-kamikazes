@@ -558,12 +558,16 @@ class MAQuadXBaseEnv(ParallelEnv):
                 # compute observations
                 observations[ag] = self.compute_observation_by_id(ag_id)
 
+                if self.targets == [] and term == True:
+                    infos[ag] = {**infos[ag], 'is_success': True}
+
                 self.current_term[ag] = term
                 self.current_trun[ag] = trunc
                 self.current_acc_rew[ag] += rew
                 self.current_inf[ag] = {**infos[ag], **info}
                 self.current_obs[ag] = observations[ag]
                 #self.save_step_data(ag)
+
 
         # increment step count and cull dead agents for the next round
         self.step_count += 1
@@ -578,7 +582,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         if self.targets == []:
             terminations = {k: True for k in self.agents}
             truncations = {k: True for k in self.agents}
+
             infos = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
+            infos = {key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in infos.keys()}
 
         return observations, rewards, terminations, truncations, infos
 

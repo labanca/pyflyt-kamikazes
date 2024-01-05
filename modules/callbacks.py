@@ -57,8 +57,9 @@ class TensorboardCallback(BaseCallback):
         ep_rewards2 = self.locals['rewards'][1]
         self.logger.record("rewards1", ep_rewards1)
         self.logger.record("rewards2", ep_rewards2)
-        if (self.num_timesteps % 80 == 0):
+        if (self.num_timesteps % 100 == 0):
             self.logger.dump(self.num_timesteps)
+
         return True
 
     def _on_training_start(self) -> None:
@@ -93,17 +94,18 @@ class TensorboardCallback(BaseCallback):
     Custom callback for plotting additional values in tensorboard.
     """
 
+    #def __init__(self, env, verbose=0):
+        #super().__init__(verbose)
+
     def init(self, verbose=0):
         super().init(verbose)
 
     def _on_step(self) -> bool:
-        # self.logger.record('reward', self.CustomEnvironment1.get_attr('total_reward')[0])
-        # ep_rewards1 = self.locals['infos']['Seeker1'][0]
-        # ep_rewards2 = self.locals['infos']['Seeker2'][0]
-        ep_rewards1 = self.locals['rewards'][0]
-        ep_rewards2 = self.locals['rewards'][1]
-        self.logger.record("rewards1", ep_rewards1)
-        self.logger.record("rewards2", ep_rewards2)
-        if (self.num_timesteps % 80 == 0):
+
+        mean_rew_vec_envs = np.array([rew for rew in self.locals['rewards']]).mean()
+        self.logger.record("rew_vec_envs", mean_rew_vec_envs)
+
+        if (self.num_timesteps % 1024 == 0):
             self.logger.dump(self.num_timesteps)
+
         return True

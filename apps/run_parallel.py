@@ -3,20 +3,20 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-model = PPO.load('apps/models/ma_quadx_chaser_20240104-181840/ma_quadx_chaser-1000000.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-3064384.zip')
 #model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
 seed=None
 
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
-    lw_center_bounds=10.0,
+    lw_center_bounds=5.0,
     lm_center_bounds=5.0,
     lw_spawn_radius=1.0,
-    lm_spawn_radius=10.0,
+    lm_spawn_radius=5.0,
     min_z=1.0,
     seed=None,
     num_lw=1,
-    num_lm=1,
+    num_lm=8,
 )
 
 
@@ -36,7 +36,7 @@ observations, infos = env.reset(seed=seed)
 
 last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
-            'survived': 0, 'ally_collision': 0, 'downed': 0}
+            'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': True}
 first_time = True
 num_games = 1
 

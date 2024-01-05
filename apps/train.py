@@ -39,13 +39,11 @@ def train_butterfly_supersuit(
     env = ss.black_death_v3(env,)
     env = ss.pettingzoo_env_to_vec_env_v1(env )
 
-
     num_vec_envs = 16
     num_cpus = num_vec_envs
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
-
-    device = get_device('cpu')
+    device = get_device('cuda')
     batch_size = 512 # 512 davi
     lr = 1e-4
     discount_factor = 0.98
@@ -54,15 +52,13 @@ def train_butterfly_supersuit(
         net_arch=dict(pi=nn_t, vf=nn_t)
     )
 
-
-
     folder_name = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
     model_name = f"{env.unwrapped.metadata.get('name')}-{steps}"
     folder_path = os.path.join("apps\\models", folder_name,)
-    log_path = os.path.join(folder_path, 'tensorboard')
+    #log_path = os.path.join(folder_path, 'tensorboard')
     filename = os.path.join(folder_path, model_name )
 
-    log_dir  = os.path.join(folder_path, 'logs', model_name)
+    log_dir = os.path.join(folder_path, 'logs', model_name)
 
 
     model = PPO(
@@ -74,15 +70,15 @@ def train_butterfly_supersuit(
         policy_kwargs=policy_kwargs,
         device=device,
         gamma=discount_factor,
-        tensorboard_log=log_path
+        tensorboard_log=log_dir
     )
 
 
-    new_logger = configure(log_dir, ["csv", "tensorboard"])
-
+    new_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
 
-    callback = TensorboardCallback()
+    callback = TensorboardCallback(verbose=1)
+
     model.learn(total_timesteps=steps, callback=callback)
 
     model.save(filename)
@@ -209,7 +205,7 @@ if __name__ == "__main__":
         min_z=1.0,
         seed=None,
         num_lw=1,
-        num_lm=1,
+        num_lm=2,
     )
 
     env_kwargs = {}
@@ -250,7 +246,7 @@ if __name__ == "__main__":
 
 
     #Train a model
-    train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=50_000, train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

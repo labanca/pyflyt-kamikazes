@@ -17,6 +17,7 @@ from stable_baselines3.common.utils import get_device
 from gymnasium.utils import EzPickle
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
+from modules.callbacks import TensorboardCallback
 
 
 def train_butterfly_supersuit(
@@ -30,8 +31,8 @@ def train_butterfly_supersuit(
     env = ss.black_death_v3(env)
     env = ss.pettingzoo_env_to_vec_env_v1(env,)
 
-    num_vec_envs = 1 #8
-    num_cpus = 1 #(os.cpu_count() or 1)
+    num_vec_envs = 16
+    num_cpus = num_vec_envs
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
     device = get_device('cuda')
@@ -46,8 +47,6 @@ def train_butterfly_supersuit(
     model_path = os.path.join('apps\\models', model_dir, model_name)
     model = PPO.load(model_path, env=env)
 
-
-
     new_total_timesteps = model.num_timesteps + steps
     new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
     folder_name = os.path.join("apps\\models", model_dir )
@@ -56,11 +55,12 @@ def train_butterfly_supersuit(
     print(f"Starting resume training on {model_name} to {new_total_timesteps} steps.")
 
     logs_dir = os.path.join(folder_name, 'logs', new_model_name)
-    new_logger = configure(logs_dir, ["csv", "tensorboard"])
+    new_logger = configure(logs_dir, [ "csv", "tensorboard"])
     model.set_logger(new_logger)
 
-    #tb_log_name = f"{new_model_name}"
-    model.learn(total_timesteps=steps, reset_num_timesteps=False, )
+    callback = TensorboardCallback(verbose=1)
+
+    model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback )
     model.save(save_path)
 
     print("Model has been saved.")
@@ -103,6 +103,7 @@ def train_butterfly_supersuit(
 
     env.close()
 
+    return new_model_name
 
 class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
@@ -110,86 +111,64 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
         MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
-seed=None
 
-spawn_settings = dict(
-    lw_center_bounds=10.0,
-    lm_center_bounds=10.0,
-    lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
-    min_z=1.0,
-    seed=None,
-    num_lw=1,
-    num_lm=2,
-)
 
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """resume training for ma_quadx_hover_20231230-221538_res_20231230-223741.zip, same but 2M more timesteps.
-
+    train_desc = """new rewards. Current_vel_angles still broken. more 1M. 10 sec episode to see if speed goes up.
 
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id] * 5.0,
+                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
                 a_min=-10.0,
                 a_max=None,
-            ) * (
-                    self.chasing[agent_id][target_id]
-                )
+            ) * self.chasing[agent_id][target_id]
 
-            # reward for engaging the enemy
-            self.rew_engaging_enemy = np.divide(3.0, self.current_vel_angles[agent_id][target_id],
-                                           where=self.current_vel_angles[agent_id][target_id] != 0) * (
-                    self.chasing[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * 1.0
-                )
+            self.rew_close_to_target = 1 / (
+                self.current_distance[agent_id][target_id]
+                if self.current_distance[agent_id][target_id] > 0 else 0.1 )   #if the 1 is to hight the kamikazes will circle the enemy. try a
 
-            # # reward for progressing to engagement
-            self.rew_near_engagement = (
-                    (self.current_magnitude[agent_id]- self.past_magnitude[agent_id])**2
-                    * 100.0
-                    * self.in_range[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * self.chasing[agent_id][target_id]
-            )
-
-            # reward for maintaning linear velocities.
-            self.rew_speed_magnitude =(
-                    (self.current_magnitude[agent_id])**2
-                    #* self.chasing[agent_id][target_id]
-                    * self.approaching[agent_id][target_id]
-                    * 1.0
-            )
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance
-                    + self.rew_engaging_enemy
-                    + self.rew_speed_magnitude
-                    + self.rew_near_engagement
+                    + self.rew_close_to_target * self.reward_coef # regularizations
+
             )
 """
+
+    spawn_settings = dict(
+        lw_center_bounds=10.0,
+        lm_center_bounds=5.0,
+        lw_spawn_radius=1.0,
+        lm_spawn_radius=10.0,
+        min_z=1.0,
+        seed=None,
+        num_lw=1,
+        num_lm=3,
+    )
+
     env_kwargs = {}
     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
                                       spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
-    env_kwargs['seed'] = seed
+    env_kwargs['seed'] = None
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 30
+    env_kwargs['max_duration_seconds'] = 10
     env_kwargs['reward_coef'] = 1.0
-    env_kwargs['lw_stand_still'] = False
+    env_kwargs['lw_stand_still'] = True
 
-    model_name = 'ma_quadx_chaser-5000.zip'
-    model_dir = 'ma_quadx_chaser_20240104-172250'
+    model_name = 'ma_quadx_chaser-3064384.zip'
+    model_dir = 'ma_quadx_chaser_20240104-195408'
 
-    num_resumes = 1
+    num_resumes = 3 0
     for i in range(num_resumes):
-        train_butterfly_supersuit(env_fn, steps=5_000, train_desc=train_desc,
+        model_name = train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc,
                                   model_name=model_name, model_dir=model_dir,
                                   **env_kwargs)
-        resume_train = True
+
+
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/
