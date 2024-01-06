@@ -139,32 +139,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.lw_stand_still = lw_stand_still
 
         self.rewards_data = []
-        self.rew_log = [
-            [
-                'self.aviary.elapsed_time'
-               ,'rew_closing_distance'
-               ,'rew_progress_eng'
-               ,'rew_engaging_enemy'
-               ,'rew_last_distance'
-               ,'ang_vel_a'
-               ,'ang_pos_a'
-               ,'lin_vel_a'
-               ,'lin_pos_a_x'
-               ,'lin_pos_a_y'
-               ,'lin_pos_a_z'
-               ,'quaternion_a'
-               ,'ang_vel_t'
-               ,'ang_pos_t'
-               ,'lin_vel_t'
-               ,'lin_pos_t_x'
-               ,'lin_pos_t_y'
-               ,'lin_pos_t_z'
-               ,'quaternion_t'
-               ,'self.current_distance[target_id]'
-               ,'self.current_angles[target_id]'
-            ]
-        ]
-
 
         self.flight_dome_size = flight_dome_size
         self.max_steps = int(agent_hz * max_duration_seconds)
@@ -279,10 +253,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_acc_rew = {k: 0.0 for k in self.agents}
         self.current_inf = {k: dict() for k in self.agents}
         self.current_obs = {k: [] for k in self.agents}
-        self.rew_closing_distance = 0.0
-        self.rew_engaging_enemy = 0.0
-        self.rew_speed_magnitude = 0.0
-        self.rew_near_engagement = 0.0
+        self.rew_closing_distance = np.zeros((self.num_drones), dtype=np.float64)
+        self.rew_close_to_target =  np.zeros((self.num_drones), dtype=np.float64)
+        self.rew_engaging_enemy =  np.zeros((self.num_drones), dtype=np.float64)
+        self.rew_speed_magnitude =  np.zeros((self.num_drones), dtype=np.float64)
+        self.rew_near_engagement =  np.zeros((self.num_drones), dtype=np.float64)
         self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
 
         self.drone_list = self.agents + self.targets
@@ -458,7 +433,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         # destroy any loyal wingman
         explosion_mapping = self.get_explosion_mapping(agent_id)
         if 'lw' in explosion_mapping.values():
-            reward += 200.0
+            reward += 100.0
             info["exploded_target"] = True
             info["is_success"] = True
             term |= True
@@ -534,23 +509,10 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.lw_manager.update(stand_still=self.lw_stand_still)
 
 
-
-
-
-            # self.agent_forward_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1], self.aviary.state(0)[-1] + self.ground_velocities[0],
-            #                              lineWidth=2, replaceItemUniqueId=self.agent_forward_line,  lineColorRGB=[1, 1, 1])
-            #
-            # self.agent_sep_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1],self.aviary.state(0)[-1] +  self.separation[1][0],
-            #                              lineWidth=2, replaceItemUniqueId=self.agent_sep_line,  lineColorRGB=[0, 1, 0.5] )
-            #
-            #
-            #print(self.chasing[1])
-            #print(self.chasing[1][0])
-
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
-                self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
+                #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
 
                 # compute term trunc reward
                 term, trunc, rew, info = self.compute_term_trunc_reward_info_by_id(ag_id)
@@ -571,7 +533,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_acc_rew[ag] += rew
                 self.current_inf[ag] = {**infos[ag], **info}
                 self.current_obs[ag] = observations[ag]
-                #self.save_step_data(ag)
+                self.save_step_data(ag)
 
 
         # increment step count and cull dead agents for the next round
@@ -820,6 +782,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         if not lw_indices.any(): # TODO seems wrong
             return self.find_nearest_lm(agent_id)
 
+
         # Filter distances based on 'lw' indices
         lw_distances = distances[lw_indices]
 
@@ -1025,16 +988,18 @@ class MAQuadXBaseEnv(ParallelEnv):
         step_data = {
             "agent_id": agent_id,
             "elapsed_time": self.aviary.elapsed_time,
-            "rew_closing_distance": self.rew_closing_distance,
-            "rew_engaging_enemy": self.rew_engaging_enemy,
-            "rew_speed_magnitude": self.rew_speed_magnitude,
-            "rew_near_engagement": self.rew_near_engagement,
+            "rew_closing_distance": self.rew_closing_distance[agent_id],
+            "rew_close_to_target": self.rew_close_to_target[agent_id],
+            "rew_engaging_enemy": self.rew_engaging_enemy[agent_id],
+            "rew_speed_magnitude": self.rew_speed_magnitude[agent_id],
+            "rew_near_engagement": self.rew_near_engagement[agent_id],
             "acc_rewards": self.current_acc_rew[agent],
             "vel_angles": self.current_vel_angles[agent_id][target_id],
             "rel_vel_magnitudade": self.current_rel_vel_magnitude[agent_id][target_id],
             "approaching": int(self.approaching[agent_id][target_id]),
             "chasing": int(self.chasing[agent_id][target_id]),
             "in_range": int(self.in_range[agent_id][target_id]),
+            "in_cone": int(self.in_cone[agent_id][target_id]),
             "current_term": int(self.current_term[agent]),
             "info[downed]": int(self.current_inf[agent].get('downed', False)),
             "info[exploded_target]": int(self.current_inf[agent].get('exploded_target', False)),

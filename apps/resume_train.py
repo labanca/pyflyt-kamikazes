@@ -32,7 +32,7 @@ def train_butterfly_supersuit(
     env = ss.black_death_v3(env)
     env = ss.pettingzoo_env_to_vec_env_v1(env,)
 
-    num_vec_envs = 16
+    num_vec_envs = 12
     num_cpus = num_vec_envs
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
@@ -89,8 +89,8 @@ def train_butterfly_supersuit(
 
         print(f"Starting resume training on {model_name} to {new_total_timesteps} steps.")
 
-        logs_dir = os.path.join(folder_name, 'logs', new_model_name)
-        new_logger = configure(logs_dir, [ "csv", "tensorboard"])
+        log_dir = os.path.join(folder_name, 'logs', new_model_name)
+        new_logger = configure(log_dir, [ "csv", "tensorboard"])
         model.set_logger(new_logger)
 
         callback = TensorboardCallback(verbose=1)
@@ -194,10 +194,10 @@ if __name__ == "__main__":
     env_kwargs['reward_coef'] = 1.0
     env_kwargs['lw_stand_still'] = False
 
-    model_name = 'ma_quadx_chaser-5038656.zip'
+    model_name = '22'
     model_dir = 'ma_quadx_chaser_20240105-210345'
 
-    num_resumes = 15
+    num_resumes = 10
     for i in range(num_resumes):
         model_name = train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc,
                                   model_name=model_name, model_dir=model_dir,
