@@ -3,7 +3,7 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-3064384.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-20267584.zip')
 #model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
 seed=None
 
@@ -16,27 +16,28 @@ spawn_settings = dict(
     min_z=1.0,
     seed=None,
     num_lw=1,
-    num_lm=8,
+    num_lm=1,
 )
 
 
 env_kwargs = {}
 env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
 env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                  + spawn_settings['lw_center_bounds'] + spawn_settings['lm_spawn_radius'] )   # dome size 50% bigger than the spawn radius
+                                  + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
 env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = spawn_settings
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 10
+env_kwargs['max_duration_seconds'] = 30.0
 env_kwargs['reward_coef'] = 1.0
+env_kwargs['lw_stand_still'] = False
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
-            'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': True}
+            'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
 first_time = True
 num_games = 1
 

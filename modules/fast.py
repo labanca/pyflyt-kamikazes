@@ -7,7 +7,7 @@ import time
 
 
 
-model = PPO.load('C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_hover_20231227-205852.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -19,28 +19,29 @@ spawn_settings = dict(
     min_z=1.0,
     seed=None,
     num_lw=2,
-    num_lm=1,
+    num_lm=3,
 )
 
 
 env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [4, 4, 1], [0, 0, 1], [10, 10, 1] ])
+env_kwargs['start_pos'] = np.array([ [4, 4, 1],[7,7,1], [12,7,1], [0, 0, 1], [10, 10, 1] ])
 env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['formation_center'] = np.array([0, 0, 1])
-env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
+env_kwargs['flight_dome_size'] =     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
+                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
 env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = None
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
 env_kwargs['max_duration_seconds'] = 10
-env_kwargs['lw_stand_still'] = False
+env_kwargs['lw_stand_still'] = True
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
 last_term = {}
-counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'mission_complete': 0, 'ally_collision': 0,
-            'exploded_by_ally': 0, 'downed': 0}
+counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
+            'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
 first_time = True
 num_games = 1
 i = 1
@@ -53,8 +54,8 @@ while env.agents:
 
 
     actions['agent_0'] = np.array([-3, -3, 0, 0.8]) # np.array([i, i, 0, 0.123*i])
-    #actions['agent_1'] = np.array([0, 0, 0, 0])
-    #actions['agent_2'] = np.array([-4*i, 0, 0, 0.3*i])
+    actions['agent_1'] = np.array([4, 4, 0, 0.8])
+    actions['agent_2'] = np.array([-5, -2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])
     i +=1
 

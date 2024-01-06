@@ -113,7 +113,7 @@ class LWManager:
         self.uav_id_types = self.env.drone_classes
         self.aviary = self.env.aviary
         self.threat_radius = threat_radius
-        self.max_velocity = np.linalg.norm(np.linalg.norm([4, 4, 4]))
+        self.max_velocity = np.linalg.norm([4, 4, 4])
         self.formation_center = self.env.formation_center
         self.shoot_range = shoot_range
 

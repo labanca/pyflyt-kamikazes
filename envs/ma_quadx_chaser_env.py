@@ -170,11 +170,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
-        # compute angles between separation and velocity vectors
-        dot_products = np.sum(self.separation * self.relative_lin_velocities, axis=-1)
-        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(self.separation)
-        cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
-        self.current_angles = np.arccos(np.clip(cosines, -1, 1))
+
 
         # opponent velocity is relative to ours in our body frame
         # TODO check with draw
@@ -185,12 +181,14 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.ground_velocities = ground_velocities
 
 
-        # angles again, trying with ground velocities
-        dot_products = np.sum(self.separation * ground_velocities, axis=-1)
-        norm_vectors = np.linalg.norm(self.separation) * np.linalg.norm(ground_velocities)
-        cosines = np.divide(dot_products, norm_vectors, where=norm_vectors != 0)
-        self.current_vel_angles = np.arccos(np.clip(cosines, -1, 1))
+        for id in self.drone_id_mapping.keys():
+            separation = self.drone_positions[id] - self.drone_positions
+            dot_products = np.sum(separation[id] * ground_velocities, axis=-1)
+            norm_vectors = np.linalg.norm(separation) * np.linalg.norm(ground_velocities)
+            cosines = dot_products / (norm_vectors + 1e-10)
+            self.current_vel_angles[id] = np.arccos(cosines)
 
+        self.current_vel_angles = self.current_vel_angles.T
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.1
         self.in_range = self.current_distance < self.lethal_distance # lethal distance = 1.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
@@ -299,7 +297,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
                 a_min=-10.0,
                 a_max=None,
-            ) * self.chasing[agent_id][target_id]
+            ) #* self.chasing[agent_id][target_id]
 
             self.rew_close_to_target = 1 / (
                 self.current_distance[agent_id][target_id]

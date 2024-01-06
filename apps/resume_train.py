@@ -14,6 +14,7 @@ import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.utils import get_device
+from stable_baselines3.ppo import MlpPolicy
 from gymnasium.utils import EzPickle
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
@@ -38,36 +39,70 @@ def train_butterfly_supersuit(
     device = get_device('cuda')
     batch_size = 512  # 512 davi
     lr = 1e-4
-    discount_factor = 0.98
+    discount_factor = 0.99
     nn_t = [128, 128, 128]
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
     )
 
     model_path = os.path.join('apps\\models', model_dir, model_name)
-    model = PPO.load(model_path, env=env)
 
-    new_total_timesteps = model.num_timesteps + steps
-    new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
-    folder_name = os.path.join("apps\\models", model_dir )
-    save_path = os.path.join(folder_name, new_model_name)
+    if not os.path.exists(model_path):
+        model_dir = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
+        model_name = f"{env.unwrapped.metadata.get('name')}-{steps}"
+        folder_name = os.path.join("apps\\models", model_dir)
+        filename = os.path.join(folder_name, model_name)
+        log_dir = os.path.join(folder_name, 'logs', model_name)
 
-    print(f"Starting resume training on {model_name} to {new_total_timesteps} steps.")
+        model = PPO(
+            MlpPolicy,
+            env,
+            verbose=1,
+            learning_rate=lr,
+            batch_size=batch_size,
+            policy_kwargs=policy_kwargs,
+            device=device,
+            gamma=discount_factor,
+            tensorboard_log=log_dir
+        )
 
-    logs_dir = os.path.join(folder_name, 'logs', new_model_name)
-    new_logger = configure(logs_dir, [ "csv", "tensorboard"])
-    model.set_logger(new_logger)
+        new_logger = configure(log_dir, ["csv", "tensorboard"])
+        model.set_logger(new_logger)
 
-    callback = TensorboardCallback(verbose=1)
+        callback = TensorboardCallback(verbose=1)
 
-    model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback )
-    model.save(save_path)
+        model.learn(total_timesteps=steps, callback=callback)
 
-    print("Model has been saved.")
+        model.save(filename)
 
-    print(f"Finished training on {new_model_name}.")
+        print("Model has been saved.")
 
-    with open(f'{save_path}.txt', 'w') as file:
+        print(f"Finished training on {model_name}.")
+
+    else:
+        model = PPO.load(model_path, env=env)
+
+        new_total_timesteps = model.num_timesteps + steps
+        new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
+        folder_name = os.path.join("apps\\models", model_dir )
+        filename = os.path.join(folder_name, new_model_name)
+
+        print(f"Starting resume training on {model_name} to {new_total_timesteps} steps.")
+
+        logs_dir = os.path.join(folder_name, 'logs', new_model_name)
+        new_logger = configure(logs_dir, [ "csv", "tensorboard"])
+        model.set_logger(new_logger)
+
+        callback = TensorboardCallback(verbose=1)
+
+        model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback )
+        model.save(filename)
+
+        print("Model has been saved.")
+
+        print(f"Finished training on {new_model_name}.")
+
+    with open(f'{filename}.txt', 'w') as file:
         # Write train params to file
         start_datetime = datetime.fromtimestamp(model.start_time / 1e9)
         current_time = datetime.now()
@@ -116,7 +151,7 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """new rewards. Current_vel_angles still broken. more 1M. 10 sec episode to see if speed goes up.
+    train_desc = """ more explode reward, more ep len .
 
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
@@ -133,37 +168,36 @@ if __name__ == "__main__":
             self.rewards[agent_id] += (
                     self.rew_closing_distance
                     + self.rew_close_to_target * self.reward_coef # regularizations
-
             )
 """
 
     spawn_settings = dict(
         lw_center_bounds=10.0,
-        lm_center_bounds=5.0,
         lw_spawn_radius=1.0,
+        lm_center_bounds=5.0,
         lm_spawn_radius=10.0,
         min_z=1.0,
         seed=None,
         num_lw=1,
-        num_lm=3,
+        num_lm=1,
     )
 
     env_kwargs = {}
     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] +
-                                      spawn_settings['lw_center_bounds']) * 2.5  # dome size 50% bigger than the spawn radius
-    env_kwargs['seed'] = None
+    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
+                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']) * 1.5
+    env_kwargs['seed'] = spawn_settings['seed']
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 10
+    env_kwargs['max_duration_seconds'] = 30
     env_kwargs['reward_coef'] = 1.0
-    env_kwargs['lw_stand_still'] = True
+    env_kwargs['lw_stand_still'] = False
 
-    model_name = 'ma_quadx_chaser-3064384.zip'
-    model_dir = 'ma_quadx_chaser_20240104-195408'
+    model_name = 'ma_quadx_chaser-5038656.zip'
+    model_dir = 'ma_quadx_chaser_20240105-210345'
 
-    num_resumes = 3 0
+    num_resumes = 15
     for i in range(num_resumes):
         model_name = train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc,
                                   model_name=model_name, model_dir=model_dir,

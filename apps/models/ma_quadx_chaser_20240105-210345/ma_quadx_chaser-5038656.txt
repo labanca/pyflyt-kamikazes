@@ -1,0 +1,60 @@
+train_desc=' increased reward coef to 1.0 and ep_len to 10 sec .\n\n            # reward for closing the distance\n            self.rew_closing_distance = np.clip(\n                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],\n                a_min=-10.0,\n                a_max=None,\n            ) * self.chasing[agent_id][target_id]\n\n            self.rew_close_to_target = 1 / (\n                self.current_distance[agent_id][target_id]\n                if self.current_distance[agent_id][target_id] > 0 else 0.1 )   #if the 1 is to hight the kamikazes will circle the enemy. try a\n\n\n            self.rewards[agent_id] += (\n                    self.rew_closing_distance\n                    + self.rew_close_to_target * self.reward_coef # regularizations\n            )\n'
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\resume_train.py'
+model.start_datetime=2024-01-06 00:45:57.229073
+elapsed_time=1:03:33.909523
+model.num_timesteps=5046272
+lw_stand_still=False
+device=device(type='cpu')
+seed=None
+batch_size=512
+model.learning_rate=0.0001
+discount_factor=0.99
+nn_t=[128, 128, 128]
+num_cpus=12
+num_vec_envs=12
+model.n_envs=12
+model.n_steps=2048
+model.n_epochs=10
+model.batch_size=512
+random_respawn=True
+spawn_settings={'lw_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_center_bounds': 5.0, 'lm_spawn_radius': 10.0, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 1}
+completion_datetime=2024-01-06 01:49:31.138596
+model.action_space=Box(-10.0, 10.0, (4,), float64)
+model.observation_space=Box(-inf, inf, (40,), float64)
+env_kwargs={'start_pos': array([[ 4.24643489, -3.78282182, 10.63829253],
+       [-6.02540726,  0.89618598,  2.13099023]]), 'start_orn': array([[ 0.69994298, -0.38626999, -2.24557189],
+       [ 0.        ,  0.        ,  0.        ]]), 'formation_center': [-7.025407256422634, 0.8961859754259258, 2.130990229888904], 'flight_dome_size': 39.0, 'spawn_settings': {'lw_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_center_bounds': 5.0, 'lm_spawn_radius': 10.0, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 1}, 'num_lm': 1, 'num_lw': 1, 'max_duration_seconds': 10, 'reward_coef': 1.0, 'lw_stand_still': False}
+model.policy_kwargs={'net_arch': {'pi': [128, 128, 128], 'vf': [128, 128, 128]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=40, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=40, out_features=128, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=128, out_features=128, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=128, out_features=128, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=128, out_features=4, bias=True)
+  (value_net): Linear(in_features=128, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

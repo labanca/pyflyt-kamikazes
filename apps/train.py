@@ -43,10 +43,10 @@ def train_butterfly_supersuit(
     num_cpus = num_vec_envs
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
-    device = get_device('cuda')
+    device = get_device('cpu')
     batch_size = 512 # 512 davi
     lr = 1e-4
-    discount_factor = 0.98
+    discount_factor = 0.99
     nn_t = [128, 128, 128]
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
@@ -74,7 +74,7 @@ def train_butterfly_supersuit(
     )
 
 
-    new_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
+    new_logger = configure(log_dir, ["csv", "tensorboard"])
     model.set_logger(new_logger)
 
     callback = TensorboardCallback(verbose=1)
@@ -199,30 +199,29 @@ if __name__ == "__main__":
 
     spawn_settings = dict(
         lw_center_bounds=10.0,
-        lm_center_bounds=5.0,
         lw_spawn_radius=1.0,
+        lm_center_bounds=5.0,
         lm_spawn_radius=10.0,
         min_z=1.0,
         seed=None,
         num_lw=1,
-        num_lm=2,
+        num_lm=1,
     )
 
     env_kwargs = {}
     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                      + spawn_settings['lw_center_bounds'] + spawn_settings[
-                                          'lm_spawn_radius'])
+                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']) * 1.5
     env_kwargs['seed'] = spawn_settings['seed']
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 10
-    env_kwargs['reward_coef'] = 1.0
-    env_kwargs['lw_stand_still'] = True
+    env_kwargs['max_duration_seconds'] = 30
+    env_kwargs['reward_coef'] =1.0
+    env_kwargs['lw_stand_still'] = False
 
     #seed = 42
-    train_desc = """new rewards. Current_vel_angles still broken.
+    train_desc = """new train, lw on.
 
             # reward for closing the distance
             self.rew_closing_distance = np.clip(
@@ -246,7 +245,7 @@ if __name__ == "__main__":
 
 
     #Train a model
-    train_butterfly_supersuit(env_fn, steps=50_000, train_desc=train_desc, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
     #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)

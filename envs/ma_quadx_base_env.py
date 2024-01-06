@@ -337,8 +337,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             seed=seed,
         )
 
-        self.agent_forward_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2)
-        self.agent_sep_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[0, 1, 0],  lineWidth=2)
+        self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2) for id in range(3)]
 
         self.change_visuals()
         #self.init_debug_vectors()
@@ -459,8 +458,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         # destroy any loyal wingman
         explosion_mapping = self.get_explosion_mapping(agent_id)
         if 'lw' in explosion_mapping.values():
-            reward += 1000.0
+            reward += 200.0
             info["exploded_target"] = True
+            info["is_success"] = True
             term |= True
 
         if self.get_collateral_explosions(agent_id):
@@ -534,18 +534,23 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.lw_manager.update(stand_still=self.lw_stand_still)
 
 
+
+
+
             # self.agent_forward_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1], self.aviary.state(0)[-1] + self.ground_velocities[0],
             #                              lineWidth=2, replaceItemUniqueId=self.agent_forward_line,  lineColorRGB=[1, 1, 1])
             #
             # self.agent_sep_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1],self.aviary.state(0)[-1] +  self.separation[1][0],
-            #                              lineWidth=2, replaceItemUniqueId=self.agent_sep_line,  lineColorRGB=[0, 1, 0.5])
-
+            #                              lineWidth=2, replaceItemUniqueId=self.agent_sep_line,  lineColorRGB=[0, 1, 0.5] )
+            #
+            #
             #print(self.chasing[1])
             #print(self.chasing[1][0])
 
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
+                self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
 
                 # compute term trunc reward
                 term, trunc, rew, info = self.compute_term_trunc_reward_info_by_id(ag_id)
@@ -656,7 +661,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                            np.random.uniform(-lm_center_bounds, lm_center_bounds),
                            np.random.uniform(min_z, lm_center_bounds + min_z)]
 
-        start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_spawn_radius,
+        start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
                                                                    lm_spawn_center, lm_spawn_radius, num_lm, min_z)
 
         start_orn_lm = (np_random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
@@ -665,8 +670,8 @@ class MAQuadXBaseEnv(ParallelEnv):
 
 
     @staticmethod
-    def generate_random_coordinates(lw_formation_center, lw_spawn_radius, lm_spawn_center, lm_spawn_radius, num_lm,
-                                    min_z):
+    def generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
+                                    lm_spawn_center, lm_spawn_radius, num_lm,  min_z):
         # Ensure the formation center and spawn center are NumPy arrays
         lw_formation_center = np.array(lw_formation_center)
         lm_spawn_center = np.array(lm_spawn_center)
@@ -680,7 +685,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
             # Check if the generated coordinates are outside the exclusion area of the lw formation
             lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-            if lm_distance > lw_spawn_radius * 3:
+            if lm_distance >  lw_center_bounds + lw_spawn_radius:
                 lm_coordinates.append([x, y, z])
 
         return np.array(lm_coordinates)
@@ -763,32 +768,14 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         return self.forward_debug_line
 
-    def draw_vel_vector(self, drone_index, line_id = None, length=1.0, lineColorRGB=[1, 1, 0] ):
+    def draw_vel_vector(self, agent_id, line_id = None, length=1.0, lineColorRGB=[1, 1, 0] ):
         # Calculate the forward vector based on the drone's orientation
 
-        drone_pos, drone_orientation = p.getBasePositionAndOrientation(drone_index)
-        vel_vector = self.aviary.state(drone_index-1)[2]
-
-
-        # Calculate the end point of the vector
-        end_point = [drone_pos[0] + length * vel_vector[0],
-                     drone_pos[1] + length * vel_vector[1],
-                     drone_pos[2] + length * vel_vector[2]]
-
-        # Draw the line in PyBullet
-        if line_id is not None:
-
-            self.forward_debug_line = self.aviary.addUserDebugLine(
-                drone_pos, end_point, lineColorRGB=lineColorRGB,
-                lineWidth=2,  replaceItemUniqueId=line_id
-            )
-        else:
-            self.forward_debug_line = self.aviary.addUserDebugLine(
-                drone_pos, end_point, lineColorRGB=lineColorRGB,
-                lineWidth=2, parentObjectUniqueId=drone_index
-            )
-
-        return self.forward_debug_line
+        debug_line = self.aviary.addUserDebugLine(self.aviary.state(agent_id)[-1],
+                                                               self.aviary.state(agent_id)[-1] + self.ground_velocities[agent_id],
+                                                               lineWidth=2, replaceItemUniqueId=line_id,
+                                                               lineColorRGB=[1, 1, 1])
+        return debug_line
 
     def draw_v1v2_vector(self, v1, v2, line_id = None, length=1.0, lineColorRGB=[1, 1, 0]):
         # Calculate the forward vector based on the drone's orientation
@@ -811,28 +798,14 @@ class MAQuadXBaseEnv(ParallelEnv):
 
 
 
-    def draw_separation_vector(self, drone_index, separation_vector, line_id = None, length=1.0, lineColorRGB=[1, 0, 0] ):
+    def draw_separation_vector(self, agent_id, target_id, line_id = None, length=1.0, lineColorRGB=[0, 1, 0] ):
         # Calculate the forward vector based on the drone's orientation
 
-        drone_pos, drone_orientation = p.getBasePositionAndOrientation(drone_index)
-        forward_vector = [math.cos(drone_orientation[2]), math.sin(drone_orientation[2]), 0]
+        self.agent_sep_line = self.aviary.addUserDebugLine(self.aviary.state(0)[-1],
+                                                           self.aviary.state(0)[-1] + self.separation[1][0],
+                                                           lineWidth=2, replaceItemUniqueId=self.agent_sep_line,
+                                                           lineColorRGB=[0, 1, 0.5])
 
-        # Calculate the end point of the vector
-        end_point = [drone_pos[0] + length * separation_vector[0],
-                     drone_pos[1] + length * separation_vector[1],
-                     drone_pos[2] + length * separation_vector[2]]
-
-        # Draw the line in PyBullet
-        if line_id is not None:
-
-            self.forward_debug_line = self.aviary.addUserDebugLine(
-                drone_pos, end_point, lineColorRGB=lineColorRGB,
-                lineWidth=2, replaceItemUniqueId=line_id
-            )
-        else:
-            self.forward_debug_line = self.aviary.addUserDebugLine(
-                drone_pos, end_point, lineColorRGB=lineColorRGB,
-                lineWidth=2, parentObjectUniqueId=drone_index)
 
         return self.forward_debug_line
 

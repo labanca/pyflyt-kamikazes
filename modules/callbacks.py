@@ -105,7 +105,7 @@ class TensorboardCallback(BaseCallback):
         mean_rew_vec_envs = np.array([rew for rew in self.locals['rewards']]).mean()
         self.logger.record("rew_vec_envs", mean_rew_vec_envs)
 
-        if (self.num_timesteps % 1024 == 0):
+        if (self.num_timesteps % (self.training_env.num_envs * 1024) == 0):
             self.logger.dump(self.num_timesteps)
 
         return True

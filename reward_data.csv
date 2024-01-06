@@ -1,0 +1,1 @@
+agent_id,elapsed_time,rew_closing_distance,rew_engaging_enemy,rew_speed_magnitude,rew_near_engagement,acc_rewards,vel_angles,rel_vel_magnitudade,approaching,chasing,in_range,current_term,info[downed],info[exploded_target],info[exploded_ally],info[crashes],info[ally_collision],info[mission_complete],info[out_of_bounds],info[timeover]
