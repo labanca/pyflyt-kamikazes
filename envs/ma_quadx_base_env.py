@@ -37,7 +37,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
         reward_coef: float = 1.0,
-        lw_stand_still: bool = False
+        lw_stand_still: bool = False,
+        rew_exploding_target: float = 1000.0
     ):
         """__init__.
 
@@ -137,6 +138,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.lethal_angle = 0.1
         self.reward_coef = reward_coef
         self.lw_stand_still = lw_stand_still
+        self.rew_exploding_target = rew_exploding_target
 
         self.rewards_data = []
 
@@ -253,11 +255,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_acc_rew = {k: 0.0 for k in self.agents}
         self.current_inf = {k: dict() for k in self.agents}
         self.current_obs = {k: [] for k in self.agents}
-        self.rew_closing_distance = np.zeros((self.num_drones), dtype=np.float64)
-        self.rew_close_to_target =  np.zeros((self.num_drones), dtype=np.float64)
-        self.rew_engaging_enemy =  np.zeros((self.num_drones), dtype=np.float64)
-        self.rew_speed_magnitude =  np.zeros((self.num_drones), dtype=np.float64)
-        self.rew_near_engagement =  np.zeros((self.num_drones), dtype=np.float64)
+        self.rew_closing_distance = np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.rew_close_to_target =  np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.rew_engaging_enemy =  np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.rew_speed_magnitude =  np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.rew_near_engagement =  np.zeros((self.num_possible_agents), dtype=np.float64)
         self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
 
         self.drone_list = self.agents + self.targets
@@ -433,7 +435,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         # destroy any loyal wingman
         explosion_mapping = self.get_explosion_mapping(agent_id)
         if 'lw' in explosion_mapping.values():
-            reward += 100.0
+            reward += self.rew_exploding_target
             info["exploded_target"] = True
             info["is_success"] = True
             term |= True
@@ -533,7 +535,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_acc_rew[ag] += rew
                 self.current_inf[ag] = {**infos[ag], **info}
                 self.current_obs[ag] = observations[ag]
-                self.save_step_data(ag)
+                #self.save_step_data(ag)
 
 
         # increment step count and cull dead agents for the next round
@@ -867,7 +869,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         for i in range(num_bodies):
             for j in range(i + 1, num_bodies):
                 # Check for collisions between body i and body j
-                points = p.getClosestPoints(bodyA=i, bodyB=j, distance=distance_threshold)
+                points = self.aviary.getClosestPoints(bodyA=i, bodyB=j, distance=distance_threshold)
 
                 # If there are points, a collision occurred
                 if points:

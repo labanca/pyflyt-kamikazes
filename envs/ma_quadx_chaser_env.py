@@ -70,6 +70,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         ),
         reward_coef: float = 1.0,
         lw_stand_still: bool = False,
+        rew_exploding_target: float = 1000.0
     ):
         """__init__.
 
@@ -98,6 +99,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             formation_center=formation_center,
             reward_coef=reward_coef,
             lw_stand_still=lw_stand_still,
+            rew_exploding_target=rew_exploding_target
         )
 
 
@@ -180,7 +182,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
-        for id in self.drone_id_mapping.keys():
+        for id in range(self.ground_velocities.shape[0]):
             separation = self.drone_positions[id] - self.drone_positions
 
             for i in range(self.separation.shape[0]):
@@ -310,15 +312,19 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 ) * self.chasing[agent_id][target_id]
 
 
+
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
-                self.rew_close_to_target[agent_id] = 1 / (exploding_distance
-                                                if exploding_distance > 0
-                                                else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a
+
+                self.rew_close_to_target[agent_id] = - exploding_distance
+
+                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
+                #                                 if exploding_distance > 0
+                #                                 else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a
 
 
             self.rewards[agent_id] += (
                     self.rew_closing_distance[agent_id]
-                    + self.rew_close_to_target[agent_id] * self.reward_coef # regularizations
+                    + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations
 
             )
 

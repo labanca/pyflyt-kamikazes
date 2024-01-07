@@ -3,8 +3,8 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-20267584.zip')
-#model = PPO.load('apps/resumes/20231230-223741_res_20231230-232053')
+#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-8438336.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-15188544.zip')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -30,7 +30,7 @@ env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
 env_kwargs['max_duration_seconds'] = 30.0
 env_kwargs['reward_coef'] = 1.0
-env_kwargs['lw_stand_still'] = False
+env_kwargs['lw_stand_still'] = True
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)

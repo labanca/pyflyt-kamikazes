@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import time
+import inspect
 from datetime import datetime
 
 import supersuit as ss
@@ -22,32 +23,32 @@ from modules.callbacks import TensorboardCallback
 
 
 def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', model_name='', model_dir='', **env_kwargs):
+    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', model_name='', model_dir='',
+        env_kwargs={}, train_kwargs={} ):
 
-    # Train a single model to play as each agent in a cooperative Parallel environment
-    env = env_fn(**env_kwargs)
+    """ Train a single model to play as each agent in a cooperative Parallel environment """
 
-    env.reset(seed=seed)
-
-    env = ss.black_death_v3(env)
-    env = ss.pettingzoo_env_to_vec_env_v1(env,)
-
-    num_vec_envs = 12
+    # unpack train kwargs
+    num_vec_envs = train_kwargs['num_vec_envs']
     num_cpus = num_vec_envs
-    env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
-
-    device = get_device('cuda')
-    batch_size = 512  # 512 davi
-    lr = 1e-4
-    discount_factor = 0.99
-    nn_t = [128, 128, 128]
+    device = train_kwargs['device']
+    batch_size = train_kwargs['batch_size']
+    lr = train_kwargs['lr']
+    discount_factor = train_kwargs['discount_factor']
+    nn_t = train_kwargs['nn_t']
     policy_kwargs = dict(
         net_arch=dict(pi=nn_t, vf=nn_t)
     )
+    env = env_fn(**env_kwargs)
+    env.reset(seed=seed)
+    env = ss.black_death_v3(env)
+    env = ss.pettingzoo_env_to_vec_env_v1(env,)
+    env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
     model_path = os.path.join('apps\\models', model_dir, model_name)
 
     if not os.path.exists(model_path):
+        print(f"-> Model {model_path} do not exist. Creating a new one.")
         model_dir = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
         model_name = f"{env.unwrapped.metadata.get('name')}-{steps}"
         folder_name = os.path.join("apps\\models", model_dir)
@@ -63,7 +64,6 @@ def train_butterfly_supersuit(
             policy_kwargs=policy_kwargs,
             device=device,
             gamma=discount_factor,
-            tensorboard_log=log_dir
         )
 
         new_logger = configure(log_dir, ["csv", "tensorboard"])
@@ -71,36 +71,32 @@ def train_butterfly_supersuit(
 
         callback = TensorboardCallback(verbose=1)
 
-        model.learn(total_timesteps=steps, callback=callback)
-
+        model.learn(total_timesteps=steps, callback=callback, progress_bar=True)
         model.save(filename)
 
-        print("Model has been saved.")
-
-        print(f"Finished training on {model_name}.")
+        print(f"Model {model_name} has been saved.")
+        new_model_name = model_name
 
     else:
-        model = PPO.load(model_path, env=env)
+        print(f"\nModel {model_path} found. Resuming training.\n")
+
+        model = PPO.load(model_path, env=env, device=device)
 
         new_total_timesteps = model.num_timesteps + steps
         new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
         folder_name = os.path.join("apps\\models", model_dir )
         filename = os.path.join(folder_name, new_model_name)
-
-        print(f"Starting resume training on {model_name} to {new_total_timesteps} steps.")
-
         log_dir = os.path.join(folder_name, 'logs', new_model_name)
-        new_logger = configure(log_dir, [ "csv", "tensorboard"])
-        model.set_logger(new_logger)
 
+        new_logger = configure(log_dir, ["csv", "tensorboard"])
+        model.set_logger(new_logger)
         callback = TensorboardCallback(verbose=1)
 
+        print(f"Starting resume training on {model_name}")
         model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback )
         model.save(filename)
 
-        print("Model has been saved.")
-
-        print(f"Finished training on {new_model_name}.")
+        print(f"Model {new_model_name} has been saved.")
 
     with open(f'{filename}.txt', 'w') as file:
         # Write train params to file
@@ -111,6 +107,8 @@ def train_butterfly_supersuit(
         file.write(f'{__file__=}\n')
         file.write(f'model.start_datetime={start_datetime}\n')
         file.write(f'elapsed_time={elapsed_time}\n')
+        file.write(f'model_name={model_name}\n')
+        file.write(f'model_name={new_model_name}\n')
         file.write(f'{model.num_timesteps=:n}\n')
         file.write(f'lw_stand_still={env_kwargs["lw_stand_still"]}\n')
         file.write(f'{device=}\n')
@@ -131,6 +129,7 @@ def train_butterfly_supersuit(
         file.write(f'{model.action_space=}\n')
         file.write(f'{model.observation_space=}\n')
         file.write(f'{env_kwargs=}\n')
+        file.write(f'{train_kwargs=}\n')
         file.write(f'{model.policy_kwargs=}\n')
         file.write(f'{model.policy=}\n')
         file.write(f'{model.policy_aliases=}\n')
@@ -138,7 +137,8 @@ def train_butterfly_supersuit(
 
     env.close()
 
-    return new_model_name
+    return f'{new_model_name}.zip', model_dir
+
 
 class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
@@ -146,29 +146,37 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
         MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
-
-
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ more explode reward, more ep len .
+    train_desc = """ Include the explosion radius (0.5) in the reward computation to incentivize collission and negative reward for current distance. 
+                            
+                if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
-            # reward for closing the distance
-            self.rew_closing_distance = np.clip(
-                self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                a_min=-10.0,
-                a_max=None,
-            ) * self.chasing[agent_id][target_id]
+                # reward for closing the distance
+                self.rew_closing_distance[agent_id] = np.clip(
+                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+                    a_min=-10.0,
+                    a_max=None,
+                ) * self.chasing[agent_id][target_id]
 
-            self.rew_close_to_target = 1 / (
-                self.current_distance[agent_id][target_id]
-                if self.current_distance[agent_id][target_id] > 0 else 0.1 )   #if the 1 is to hight the kamikazes will circle the enemy. try a
+                
+
+                exploding_distance = self.current_distance[agent_id][target_id] - 0.5
+
+                self.rew_close_to_target[agent_id] = - exploding_distance
+                 
+                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
+                #                                 if exploding_distance > 0
+                #                                 else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a
 
 
             self.rewards[agent_id] += (
-                    self.rew_closing_distance
-                    + self.rew_close_to_target * self.reward_coef # regularizations
+                    self.rew_closing_distance[agent_id]
+                    + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations
+
             )
+
 """
 
     spawn_settings = dict(
@@ -192,17 +200,28 @@ if __name__ == "__main__":
     env_kwargs['num_lw'] = spawn_settings['num_lw']
     env_kwargs['max_duration_seconds'] = 30
     env_kwargs['reward_coef'] = 1.0
-    env_kwargs['lw_stand_still'] = False
+    env_kwargs['lw_stand_still'] = True
+    env_kwargs['rew_exploding_target'] = 1000
 
-    model_name = '22'
-    model_dir = 'ma_quadx_chaser_20240105-210345'
+    nn_t = [256, 256, 512]
+    train_kwargs = dict(
+        device=get_device('cpu'),
+        batch_size=1024,
+        lr=1e-4,
+        discount_factor=0.99,
+        nn_t=nn_t,
+        num_vec_envs=16,
+    )
 
-    num_resumes = 10
+
+    model_dir = 'ma_quadx_chaser_20240107-112226'
+    model_name = 'a'
+
+    num_resumes = 5
     for i in range(num_resumes):
-        model_name = train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc,
-                                  model_name=model_name, model_dir=model_dir,
-                                  **env_kwargs)
-
-
+        model_name, model_dir = train_butterfly_supersuit(
+                                    env_fn=env_fn, steps=5_000, train_desc=train_desc,
+                                    model_name=model_name, model_dir=model_dir,
+                                    env_kwargs=env_kwargs, train_kwargs=train_kwargs)
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/
