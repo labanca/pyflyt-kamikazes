@@ -988,6 +988,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         agent_id = self.agent_name_mapping[agent]
         target_id = self.current_target_id[agent_id]
         step_data = {
+            "aviary_steps": self.aviary.aviary_steps,
+            "physics_steps": self.aviary.physics_steps,
+
+            "step_count": self.step_count,
             "agent_id": agent_id,
             "elapsed_time": self.aviary.elapsed_time,
             "rew_closing_distance": self.rew_closing_distance[agent_id],
@@ -1008,6 +1012,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             "info[exploded_ally]": int(self.current_inf[agent].get('exploded_ally', False)),
             "info[crashes]": int(self.current_inf[agent].get('crashes', False)),
             "info[ally_collision]": int(self.current_inf[agent].get('ally_collision', False)),
+            "info[is_success]": int(self.current_inf[agent].get('is_success', False)),
             "info[mission_complete]": int(self.current_inf[agent].get('mission_complete', False)),
             "info[out_of_bounds]": int(self.current_inf[agent].get('out_of_bounds', False)),
             "info[timeover]": int(self.current_inf[agent].get('timeover', False)),

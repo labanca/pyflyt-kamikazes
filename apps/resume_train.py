@@ -205,22 +205,22 @@ if __name__ == "__main__":
 
     nn_t = [256, 256, 512]
     train_kwargs = dict(
-        device=get_device('cpu'),
+        device=get_device('cuda'),
         batch_size=1024,
         lr=1e-4,
-        discount_factor=0.99,
+        discount_factor=0.98,
         nn_t=nn_t,
         num_vec_envs=16,
     )
 
 
-    model_dir = 'ma_quadx_chaser_20240107-112226'
-    model_name = 'a'
+    model_dir = 'ma_quadx_chaser_20240107-202245'
+    model_name = 'ma_quadx_chaser-5063232.zip'
 
     num_resumes = 5
     for i in range(num_resumes):
         model_name, model_dir = train_butterfly_supersuit(
-                                    env_fn=env_fn, steps=5_000, train_desc=train_desc,
+                                    env_fn=env_fn, steps=1_000_000, train_desc=train_desc,
                                     model_name=model_name, model_dir=model_dir,
                                     env_kwargs=env_kwargs, train_kwargs=train_kwargs)
 

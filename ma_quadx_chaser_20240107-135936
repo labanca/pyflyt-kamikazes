@@ -1,0 +1,101 @@
+ma_quadx_chaser-1000000.zip:
+  lengths:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - &id002 !!python/object/apply:numpy.dtype
+      args:
+      - i4
+      - false
+      - true
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - !!binary |
+      hwMAAA==
+  mean_rew: !!python/object/apply:numpy.core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    AABgyrhmf0A=
+  reward:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      AABgyrhmf0A=
+ma_quadx_chaser-2015808.zip:
+  lengths:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id002
+    - !!binary |
+      hwMAAA==
+  mean_rew: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AACANb6HhUA=
+  reward:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      AACANb6HhUA=
+ma_quadx_chaser-3031616.zip:
+  lengths:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id002
+    - !!binary |
+      hwMAAA==
+  mean_rew: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AACIaBWeiEA=
+  reward:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      AACIaBWeiEA=
+ma_quadx_chaser-4047424.zip:
+  lengths:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id002
+    - !!binary |
+      oQAAAA==
+  mean_rew: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AAAABesjQEA=
+  reward:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      AAAABesjQEA=
+ma_quadx_chaser-5063232.zip:
+  lengths:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id002
+    - !!binary |
+      KgAAAA==
+  mean_rew: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AABQdZA3ccA=
+  reward:
+  - !!python/object/apply:numpy.core.multiarray.scalar
+    - *id001
+    - !!binary |
+      AABQdZA3ccA=

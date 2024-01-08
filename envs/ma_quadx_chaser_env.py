@@ -311,21 +311,17 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     a_max=None,
                 ) * self.chasing[agent_id][target_id]
 
-
-
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
 
-                self.rew_close_to_target[agent_id] = - exploding_distance
+                self.rew_close_to_target[agent_id] = 1 / (exploding_distance
+                                                          if exploding_distance > 0
+                                                          else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
-                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
-                #                                 if exploding_distance > 0
-                #                                 else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a
-
+                # self.rew_close_to_target[agent_id] = - exploding_distance / (self.initial_distance - 0.11)
 
             self.rewards[agent_id] += (
-                    self.rew_closing_distance[agent_id]
-                    + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations
-
+                                  self.rew_closing_distance[agent_id]
+                                  + self.rew_close_to_target[agent_id]  * self.reward_coef * (1 - self.step_count / self.max_steps)  # regularizations
             )
 
     @staticmethod
@@ -378,10 +374,10 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         import csv
 
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ["agent_id", "elapsed_time",
+            fieldnames = [ "aviary_steps", "physics_steps", "step_count", "agent_id", "elapsed_time",
                           "rew_closing_distance", "rew_close_to_target", "rew_engaging_enemy", "rew_speed_magnitude", "rew_near_engagement", "acc_rewards",
                           "vel_angles", "rel_vel_magnitudade", "approaching", "chasing", "in_range", "in_cone", "current_term",
-                          "info[downed]", "info[exploded_target]", "info[exploded_ally]",  "info[crashes]", "info[ally_collision]",
+                          "info[downed]", "info[exploded_target]", "info[exploded_ally]",  "info[crashes]", "info[ally_collision]", "info[is_success]",
                             "info[mission_complete]", "info[out_of_bounds]", "info[timeover]"
                           ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 #model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-8438336.zip')
-model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-15188544.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240107-173953/ma_quadx_chaser-5063232.zip')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -15,8 +15,8 @@ spawn_settings = dict(
     lm_spawn_radius=5.0,
     min_z=1.0,
     seed=None,
-    num_lw=1,
-    num_lm=1,
+    num_lw=3,
+    num_lm=6,
 )
 
 
@@ -73,7 +73,7 @@ while env.agents:
         print(f'{truncations=}\n')
         print(f'{infos=}\n\n\n')
         #time.sleep(5)
-        #env.write_step_data('reward_data.csv')
+        env.write_step_data('reward_data.csv')
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
 

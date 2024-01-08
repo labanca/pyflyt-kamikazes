@@ -1,13 +1,23 @@
+import glob
+import os.path
+import yaml
+
+
 from gymnasium.utils import EzPickle
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
-import supersuit as ss
+from pathlib import Path
 
+import supersuit as ss
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from stable_baselines3 import PPO
 import numpy as np
 import time
 
+
+def save_dict_to_yaml(data, file_path):
+    with open(file_path, 'w') as yaml_file:
+        yaml.dump(data, yaml_file, default_flow_style=False, sort_keys=False)
 
 class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
@@ -21,7 +31,7 @@ def eval(env_fn, n_eval_episodes: int = 100, num_vec_envs: int =1, model_name: s
 
     env.reset(seed=kwargs['seed'])
 
-    print(f"Starting eval on {str(env.metadata['name'])}.")
+    print(f"Starting eval on {model_name}.")
 
     env = ss.black_death_v3(env,)
     env = ss.pettingzoo_env_to_vec_env_v1(env )
@@ -32,7 +42,7 @@ def eval(env_fn, n_eval_episodes: int = 100, num_vec_envs: int =1, model_name: s
     model = PPO.load(model_name)
 
     deterministic = True
-    episode_rewards, dontknow = evaluate_policy(
+    rewards, lengths = evaluate_policy(
                     model,
                     env,
                     render=False,
@@ -41,13 +51,20 @@ def eval(env_fn, n_eval_episodes: int = 100, num_vec_envs: int =1, model_name: s
                     deterministic=deterministic,
                 )
 
-    print(f'{episode_rewards=}')
-    print(f'{np.array(episode_rewards).mean()=}')
-    print(f'{dontknow}')
+    output = dict(
+        ep_mean_rew=float(np.array(rewards).mean()),
+        ep_mean_len=float(np.array(lengths).mean()),
+        reward=[float(r) for r in rewards],
+        lengths=[int(i) for i in lengths],
+
+    )
+
+    return output
 
 if __name__ == "__main__":
 
     env_fn = EZPEnv
+
     spawn_settings = dict(
         lw_center_bounds=5.0,
         lm_center_bounds=5.0,
@@ -60,13 +77,16 @@ if __name__ == "__main__":
     )
 
     env_kwargs = {}
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+        'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']) * 1.5  # dome size 50% bigger than the spawn radius
-    env_kwargs['seed'] = spawn_settings['seed']
+                                      + spawn_settings['lw_center_bounds'] + spawn_settings[
+                                          'lm_center_bounds'])  # dome size 50% bigger than the spawn radius
+    env_kwargs['seed'] = None
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 30
+    env_kwargs['max_duration_seconds'] = 30.0
     env_kwargs['reward_coef'] = 1.0
     env_kwargs['lw_stand_still'] = True
 
@@ -75,10 +95,23 @@ if __name__ == "__main__":
                 'exploded_by_ally': 0, 'downed': 0}
 
 
-    n_eval_episodes = 10
-    model_name = 'apps/models/ma_quadx_chaser_20240106-234723/ma_quadx_chaser-1000000.zip'
+    n_eval_episodes = 100
+    model_dir = 'ma_quadx_chaser_20240107-173953'
+    root_path = Path('apps/models')
+    model_folder = Path.joinpath(root_path, model_dir)
+    files_paths = glob.glob(f"{model_folder}/*.zip")
+    model_names = [Path(file).name for file in files_paths]
 
-    eval(env_fn, n_eval_episodes=n_eval_episodes, num_vec_envs=1, model_name=model_name,  **env_kwargs)
+    data = dict()
+    result_dict = dict()
+
+    for file, model_name in zip(files_paths, model_names):
+
+        result_dict = eval(env_fn, n_eval_episodes=n_eval_episodes, num_vec_envs=1, model_name=file,  **env_kwargs)
+        data[model_name] = {**result_dict}
+
+    yaml_file = Path(model_folder, model_dir +".yaml")
+    save_dict_to_yaml(data, yaml_file)
 
 
 
