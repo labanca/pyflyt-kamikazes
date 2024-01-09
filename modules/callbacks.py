@@ -40,52 +40,24 @@ class HParamCallback(BaseCallback):
         return True
 
 
-model = A2C("MlpPolicy", "CartPole-v1", tensorboard_log="runs/", verbose=1)
-model.learn(total_timesteps=int(5e4), callback=HParamCallback())
-# Define your custom callback class
 class TensorboardCallback(BaseCallback):
-    def __init__(self, verbose=0):
-        super(TensorboardCallback, self).__init__(verbose)
-        self.best_mean_reward = -np.inf
+    """
+    Custom callback for plotting additional values in tensorboard.
+    """
 
+    #def __init__(self, env, verbose=0):
+        #super().__init__(verbose)
+
+    def init(self, verbose=0):
+        super().init(verbose)
 
     def _on_step(self) -> bool:
-        # Log additional tensor
-        self.logger.record("dummy_value", 42)
 
-        # Log the current mean reward to Tensorboard
-        x, y = ts2xy(load_results(self.training_env), 'timesteps')
-        if len(x) > 0:
-            mean_reward = np.mean(y[-100:])
-            if mean_reward > self.best_mean_reward:
-                self.best_mean_reward = mean_reward
-                self.logger.record("best_mean_reward", float(mean_reward))
+        mean_rew_vec_envs = np.array([rew for rew in self.locals['rewards']]).mean()
+        self.logger.record("rew_vec_envs", mean_rew_vec_envs)
+
+        if self.num_timesteps % (self.model.n_steps) == 0:
+            pass
+            #self.logger.dump(self.num_timesteps)
 
         return True
-
-    def _on_training_start(self) -> None:
-        """
-        This method is called before the first rollout starts.
-        """
-        pass
-
-    def _on_rollout_start(self) -> None:
-        """
-        A rollout is the collection of environment interaction
-        using the current policy.
-        This event is triggered before collecting new samples.
-        """
-        pass
-
-
-    def _on_rollout_end(self) -> None:
-        """
-        This event is triggered before updating the policy.
-        """
-        pass
-
-    def _on_training_end(self) -> None:
-        """
-        This event is triggered before exiting the `learn()` method.
-        """
-        pass

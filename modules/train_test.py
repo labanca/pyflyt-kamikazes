@@ -22,7 +22,7 @@ from gymnasium.utils import EzPickle
 from pettingzoo.utils import parallel_to_aec
 
 #from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
-from modules.envs.ma_quadx_hover_env import MAQuadXHoverEnv
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 
 
 def train_butterfly_supersuit(
@@ -177,10 +177,10 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
     return avg_reward_per_game
 
 
-class EZPEnv(EzPickle, MAQuadXHoverEnv):
+class EZPEnv(EzPickle, MAQuadXChaserEnv):
     def __init__(self, *args, **kwargs):
         EzPickle.__init__(self, *args, **kwargs)
-        MAQuadXHoverEnv.__init__(self, *args, **kwargs)
+        MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
 seed=None

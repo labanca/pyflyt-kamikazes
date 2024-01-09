@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from modules.envs_test.ma_fixedwing_base_env import MAFixedwingBaseEnv
+from PyFlyt.pz_envs.fixedwing_envs.ma_fixedwing_base_env import MAFixedwingBaseEnv
 
 
 # fix numpy buggy cross
@@ -60,8 +60,8 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         """
         # placeholder starting positions
         super().__init__(
-            start_pos=np.array([[10.0, 0.0, 10.0], [-5.0, 0.0, 10.0], [10.0, 5.0, 10.0], [-5.0, 5.0, 10.0] ]),
-            start_orn=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+            start_pos=np.array([[10.0, 0.0, 10.0], [-10.0, 0.0, 10.0]]),
+            start_orn=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
             flight_dome_size=flight_dome_size,
             max_duration_seconds=max_duration_seconds,
             angle_representation="euler",
@@ -121,7 +121,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         Returns:
             tuple[dict[str, Any], dict[str, Any]]:
         """
-        self.start_pos, self.start_orn = self.start_pos, self.start_orn
+        self.start_pos, self.start_orn = self.start_pos, self.start_orn #self._get_start_pos_orn(seed)
 
         # define custom forward velocity
         _, start_vec = self.compute_rotation_forward(self.start_orn)
@@ -133,7 +133,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         super().begin_reset(seed, options, drone_options=drone_options)
 
         # reset runtime parameters
-        self.health = np.ones((self.num_possible_agents,1,self.num_possible_agents), dtype=np.float64)
+        self.health = np.ones(2, dtype=np.float64)
         self.in_cone = np.zeros((2,), dtype=bool)
         self.in_range = np.zeros((2,), dtype=bool)
         self.chasing = np.zeros((2,), dtype=bool)
@@ -177,10 +177,9 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         self.attitudes[:, -1] -= forward_vecs * 0.35
 
         # compute the vectors of each drone to each drone
-        #separation = self.attitudes[::-1, -1] - self.attitudes[:, -1]
-        separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
+        separation = self.attitudes[::-1, -1] - self.attitudes[:, -1]
         self.previous_distance = self.current_distance.copy()
-        self.current_distance = np.linalg.norm(separation, axis=-1)
+        self.current_distance = np.linalg.norm(separation[0])
 
         # compute engagement angles
         self.previous_angles = self.current_angles.copy()
@@ -203,7 +202,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         self.current_hits = self.in_cone & self.in_range & self.chasing
 
         # update health based on hits
-        self.health -= self.damage_per_hit * self.current_hits[:, np.newaxis, :][::-1]
+        self.health -= self.damage_per_hit * self.current_hits[::-1]
 
         """COMPUTE THE STATE VECTOR"""
         # form the opponent state matrix

@@ -7,6 +7,10 @@ stable_baselines3
 pandas
 matplotlib
 gymnasium
+tensorflow
+tensorboard
+tqdm
+rich
 
 
 # didnt find a way to put the following in the requirements.txt. Run manually.
