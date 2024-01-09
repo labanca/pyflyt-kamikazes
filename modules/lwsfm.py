@@ -113,7 +113,7 @@ class LWManager:
         self.uav_id_types = self.env.drone_classes
         self.aviary = self.env.aviary
         self.threat_radius = threat_radius
-        self.max_velocity = np.linalg.norm([4, 4, 4])
+        #self.max_velocity = self.env.max_velocity_magnitude
         self.formation_center = self.env.formation_center
         self.shoot_range = shoot_range
 
@@ -320,9 +320,9 @@ class LWFSM:
 
                 # Calculate hit probability based on velocity
                 #target_drone_velocity = self.manager.env.attitudes[self.current_threat_id][2, :]
-                velocity_magnitude = self.manager.env.current_rel_vel_magnitude[self.current_threat_id][self.id]
+                velocity_magnitude = self.manager.env.current_magnitude[self.current_threat_id]
                 max_hit_probability = 0.9
-                hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.max_velocity, 0.05)
+                hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.env.max_velocity_magnitude, 0.01)
 
                 # Determine if the shot hits
                 shot_outcome = np.random.random()

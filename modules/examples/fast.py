@@ -7,7 +7,7 @@ import time
 
 
 
-model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
+#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -22,19 +22,33 @@ spawn_settings = dict(
     num_lm=3,
 )
 
+flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'],
+start_pos = np.array([ [4, 4, 1], [7,7, 1], [12, 7, 1], [0, 0, 1], [10, 10, 1]])
+start_orn = np.zeros_like(start_pos)
+formation_center = np.array([0, 0, 1])
 
-env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [4, 4, 1],[7,7,1], [12,7,1], [0, 0, 1], [10, 10, 1] ])
-env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
-env_kwargs['formation_center'] = np.array([0, 0, 1])
-env_kwargs['flight_dome_size'] =     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
-env_kwargs['seed'] = seed
-env_kwargs['spawn_settings'] = None
-env_kwargs['num_lm'] = spawn_settings['num_lm']
-env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 10
-env_kwargs['lw_stand_still'] = True
+env_kwargs = dict(
+    start_pos=start_pos,
+    start_orn=start_orn,
+    formation_center=formation_center,
+    flight_dome_size=flight_dome_size,
+    seed=None,
+    spawn_settings=None,
+    num_lm=spawn_settings['num_lm'],
+    num_lw=spawn_settings['num_lm'],
+    max_duration_seconds=30,
+    distance_factor=0.5,
+    speed_factor=1.0,
+    lw_moves_random=False,
+    lw_chases=False,
+    lw_attacks=False,
+    lw_threat_radius=4.0,
+    lw_shoot_range=1.0,
+    agent_hz=30,
+    max_velocity_magnitude=10,
+    rew_exploding_target=100,
+
+)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
