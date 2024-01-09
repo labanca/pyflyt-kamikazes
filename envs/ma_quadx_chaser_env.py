@@ -293,7 +293,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         """Computes the termination, truncation, and reward of the current timestep."""
         term, trunc, reward, info = super().compute_base_term_trunc_reward_info_by_id(agent_id)
 
-        self._compute_engagement_rewards(agent_id)
+        self._compute_engagement_rewards_old(agent_id)
 
         reward += self.rewards[agent_id]
 
@@ -303,6 +303,42 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             self.disarm_drone(agent_id)
 
         return term, trunc, reward, info
+
+    def _compute_engagement_rewards_old(self, agent_id) -> None:
+        """_compute_engagement_rewards."""
+        # reset rewards
+        self.rewards[agent_id] *= 0.0
+        ag = self.drone_id_mapping[agent_id]
+        target_id = self.find_nearest_lw(agent_id)
+        self.current_target_id[agent_id] = target_id # stores targets
+
+        # sparse reward computation
+        if not self.sparse_reward:
+
+            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
+                    a_min=0,
+                    a_max=None,
+                ) * (
+                    self.chasing[agent_id][target_id]
+                )
+
+                # reward for maintaning linear velocities.
+                self.rew_speed_magnitude[agent_id] = (
+                        (self.current_magnitude[agent_id] ** 2)
+                        * self.chasing[agent_id][target_id]
+                        * self.approaching[agent_id][target_id]
+                        * 1.0
+                )
+
+            self.rewards[agent_id] += (
+                    self.rew_closing_distance[agent_id]
+                    + self.rew_engaging_enemy[agent_id]
+                    + self.rew_speed_magnitude[agent_id]
+                    + self.rew_near_engagement[agent_id]
+            )
 
 
     def _compute_engagement_rewards(self, agent_id) -> None:

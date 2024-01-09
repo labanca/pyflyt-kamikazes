@@ -189,7 +189,7 @@ if __name__ == "__main__":
         min_z=0.5,
         seed=None,
         num_lw=1,
-        num_lm=3,
+        num_lm=2,
     )
 
     env_kwargs = {}
@@ -206,10 +206,10 @@ if __name__ == "__main__":
     env_kwargs['lw_stand_still'] = False
     env_kwargs['rew_exploding_target'] = 200
 
-    nn_t = [256, 256, 256]
+    nn_t = [128, 128, 128]
     train_kwargs = dict(
         device=get_device('cuda'),
-        batch_size=1024,
+        batch_size=512,
         lr=1e-4,
         discount_factor=0.99,
         nn_t=nn_t,
@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     steps = 1024 * 1000
 
-    num_resumes = 40
+    num_resumes = 3
     for i in range(num_resumes):
 
         model_name, model_dir = train_butterfly_supersuit(
