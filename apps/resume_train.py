@@ -149,7 +149,7 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ Include the explosion radius (0.5) in the reward computation to incentivize collission and negative reward for current distance. 
+    train_desc = """ LW on and many agents since the beggining, rew_coef higher . 
                             
                 if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
                     self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
                     a_min=-10.0,
                     a_max=None,
-                ) * self.chasing[agent_id][target_id]
+                )  
 
                 
 
@@ -176,18 +176,20 @@ if __name__ == "__main__":
                     + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations
 
             )
+            
+            
 
 """
 
     spawn_settings = dict(
         lw_center_bounds=10.0,
-        lw_spawn_radius=1.0,
+        lw_spawn_radius=2.0,
         lm_center_bounds=5.0,
         lm_spawn_radius=10.0,
-        min_z=1.0,
+        min_z=0.5,
         seed=None,
         num_lw=1,
-        num_lm=1,
+        num_lm=3,
     )
 
     env_kwargs = {}
@@ -198,30 +200,80 @@ if __name__ == "__main__":
     env_kwargs['spawn_settings'] = spawn_settings
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 30
-    env_kwargs['reward_coef'] = 1.0
-    env_kwargs['lw_stand_still'] = True
-    env_kwargs['rew_exploding_target'] = 1000
+    env_kwargs['max_duration_seconds'] = 15
+    env_kwargs['distance_factor'] = 0.1
+    env_kwargs['speed_factor'] = 1.0
+    env_kwargs['lw_stand_still'] = False
+    env_kwargs['rew_exploding_target'] = 200
 
-    nn_t = [256, 256, 512]
+    nn_t = [256, 256, 256]
     train_kwargs = dict(
         device=get_device('cuda'),
         batch_size=1024,
         lr=1e-4,
-        discount_factor=0.98,
+        discount_factor=0.99,
         nn_t=nn_t,
         num_vec_envs=16,
     )
 
 
     model_dir = 'ma_quadx_chaser_20240107-202245'
-    model_name = 'ma_quadx_chaser-5063232.zip'
+    model_name = 'a'
 
-    num_resumes = 5
+    steps = 1024 * 1000
+
+    num_resumes = 40
     for i in range(num_resumes):
+
         model_name, model_dir = train_butterfly_supersuit(
-                                    env_fn=env_fn, steps=1_000_000, train_desc=train_desc,
-                                    model_name=model_name, model_dir=model_dir,
-                                    env_kwargs=env_kwargs, train_kwargs=train_kwargs)
+            env_fn=env_fn, steps=steps, train_desc=train_desc,
+            model_name=model_name, model_dir=model_dir,
+            env_kwargs=env_kwargs, train_kwargs=train_kwargs)
+
+        if (i+1) % 5 == 0:
+
+            spawn_settings['num_lm'] += 1
+            env_kwargs['num_lm'] = spawn_settings['num_lm']
+            env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+                'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
+            env_kwargs['spawn_settings'] = spawn_settings
+
+        if (i+1) % 10 == 0:
+
+            env_kwargs['speed_factor'] += 5.0
+            spawn_settings['num_lm'] += 1
+            spawn_settings['num_lw'] += 1
+            env_kwargs['num_lm'] = spawn_settings['num_lm']
+            env_kwargs['num_lw'] = spawn_settings['num_lw']
+            env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+                'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
+            env_kwargs['spawn_settings'] = spawn_settings
+
+
+
+        # if i == 10:
+        #     spawn_settings['num_lm'] = 6
+        #     spawn_settings['num_lw'] = 2
+        #     env_kwargs['num_lm'] = spawn_settings['num_lm']
+        #     env_kwargs['num_lw'] = spawn_settings['num_lw']
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+        #         'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #
+        # if i == 15:
+        #     spawn_settings['num_lm'] = 9
+        #     spawn_settings['num_lw'] = 3
+        #     env_kwargs['num_lm'] = spawn_settings['num_lm']
+        #     env_kwargs['num_lw'] = spawn_settings['num_lw']
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+        #         'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #
+        #
+        # if i == 20:
+        #     env_kwargs['lw_stand_still'] = False
+
+        # if i == 25:
+        #     env_kwargs['reward_coef'] = 1.5
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/

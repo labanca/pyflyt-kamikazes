@@ -36,7 +36,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
-        reward_coef: float = 1.0,
+        distance_factor: float = 1.0,
+        speed_factor: float = 1.0,
         lw_stand_still: bool = False,
         rew_exploding_target: float = 1000.0
     ):
@@ -134,12 +135,12 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.num_lm = self.spawn_settings['num_lm'] if spawn_settings else num_lm
         self.num_lw = self.spawn_settings['num_lw'] if spawn_settings else num_lw
         self.formation_center = formation_center
-        self.lethal_distance = 1
-        self.lethal_angle = 0.1
-        self.reward_coef = reward_coef
+        self.lethal_distance = 2.5
+        self.lethal_angle = 0.15
+        self.distance_factor = distance_factor
+        self.speed_factor = speed_factor
         self.lw_stand_still = lw_stand_still
         self.rew_exploding_target = rew_exploding_target
-
         self.rewards_data = []
 
         self.flight_dome_size = flight_dome_size
@@ -260,8 +261,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.rew_engaging_enemy =  np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rew_speed_magnitude =  np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rew_near_engagement =  np.zeros((self.num_possible_agents), dtype=np.float64)
-        self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
+        self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
 
+        self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
         self.uav_mapping = np.array(['lm'] * self.num_lm + ['lw'] * (len(self.start_pos) - self.num_lm))
@@ -271,7 +273,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.attitudes= np.zeros((self.num_drones, 4,3), dtype=np.float64)
         self.drone_positions = np.zeros((self.num_drones, 3), dtype=np.float64)
 
-        self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
+
         self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
         self.in_range = np.zeros((self.num_drones,self.num_drones), dtype=bool)
         self.chasing = np.zeros((self.num_drones,self.num_drones), dtype=bool)
@@ -441,7 +443,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             term |= True
 
         if self.get_collateral_explosions(agent_id):
-            reward += 0
+            reward -= 100
             if not info.get("exploded_target", False): # avoid misscounting when exploded the same target
                 info["exploded_by_ally"] = True
             term |= True
@@ -514,6 +516,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
+                #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
                 #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
 
                 # compute term trunc reward

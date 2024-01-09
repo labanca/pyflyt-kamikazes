@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 #model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-8438336.zip')
-model = PPO.load('apps/models/ma_quadx_chaser_20240107-173953/ma_quadx_chaser-5063232.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
 seed=None
 
 #print((os.cpu_count() or 1))
@@ -15,8 +15,8 @@ spawn_settings = dict(
     lm_spawn_radius=5.0,
     min_z=1.0,
     seed=None,
-    num_lw=3,
-    num_lm=6,
+    num_lw=1,
+    num_lm=3,
 )
 
 
@@ -28,9 +28,11 @@ env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = spawn_settings
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 30.0
-env_kwargs['reward_coef'] = 1.0
-env_kwargs['lw_stand_still'] = True
+env_kwargs['max_duration_seconds'] = 15.0
+env_kwargs['distance_factor'] = 1.0
+env_kwargs['speed_factor'] = 10.0
+env_kwargs['lw_stand_still'] = False
+env_kwargs['rew_exploding_target'] = 1000
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)

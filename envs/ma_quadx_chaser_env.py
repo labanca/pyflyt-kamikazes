@@ -68,7 +68,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         formation_center: np.ndarray = np.array(
             [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         ),
-        reward_coef: float = 1.0,
+        distance_factor: float = 1.0,
+        speed_factor: float = 1.0,
         lw_stand_still: bool = False,
         rew_exploding_target: float = 1000.0
     ):
@@ -97,7 +98,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             num_lm=num_lm,
             num_lw=num_lw,
             formation_center=formation_center,
-            reward_coef=reward_coef,
+            distance_factor=distance_factor,
+            speed_factor=speed_factor,
             lw_stand_still=lw_stand_still,
             rew_exploding_target=rew_exploding_target
         )
@@ -193,7 +195,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         self.current_vel_angles = self.current_vel_angles.T
         self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.15
-        self.in_range = self.current_distance < self.lethal_distance # lethal distance = 1.0
+        self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 1.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
 
@@ -212,19 +214,31 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         raw_state = self.compute_attitude_by_id(agent_id)
         aux_state = self.compute_auxiliary_by_id(agent_id)
-        ang_vel, ang_pos, lin_vel, lin_pos, quaternion = raw_state
+        ang_vel, ang_pos, lin_vel, lin_pos, quartenion = raw_state
+        rotation = np.array(self.aviary.getMatrixFromQuaternion(quartenion)).reshape(3, 3)
+
+        rel_lin_vel = self.ground_velocities[agent_id]
 
         if near_ally_id != -1:
-            ally_lin_vel = self.ground_velocities[near_ally_id]
+            ally_rel_lin_vel = self.ground_velocities[near_ally_id]
+
+
             ally_lin_pos = self.drone_positions[near_ally_id]
+            ally_rel_lin_pos= np.matmul((ally_lin_pos - lin_pos), rotation)
         else:
-            ally_lin_vel = np.array([False, False, False])
-            ally_lin_pos = np.array([False, False, False])
+            ally_rel_lin_vel = np.array([False, False, False])
+            ally_rel_lin_pos = np.array([False, False, False])
 
         # target_attitude = self.aviary.state(target_id)
         target_attitude = self.compute_attitude_by_id(target_id)
-        ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quaternion_target = target_attitude
+        ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quarternion_target = target_attitude
         hit_probability = max(0.9 - self.current_rel_vel_magnitude[agent_id][target_id] /self.lw_manager.max_velocity, 0.05)
+
+        lin_rel_vel_target = self.ground_velocities[target_id]
+
+        # drone to target
+
+        lin_rel_pos_target = np.matmul((lin_pos_target - lin_pos), rotation)
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -232,19 +246,19 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 [
                     *ang_vel,
                     *ang_pos,
-                    *lin_vel,
+                    *rel_lin_vel,
                     *lin_pos,
                     *aux_state,
                     *self.past_actions[agent_id],
                     self.current_rel_vel_magnitude[agent_id][target_id],
 
-                    *ally_lin_vel,
-                    *ally_lin_pos,
+                    *ally_rel_lin_vel,
+                    *ally_rel_lin_pos,
 
                     *ang_vel_target,
                     *ang_pos_target,
-                    *lin_vel_target,
-                    *lin_pos_target,
+                    *lin_rel_vel_target,
+                    *lin_rel_pos_target,
                     hit_probability,
                 ]
             )
@@ -253,19 +267,19 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 [
                     *ang_vel,
                     *ang_pos,
-                    *lin_vel,
+                    *rel_lin_vel,
                     *lin_pos,
                     *aux_state,
                     *self.past_actions[agent_id],
                     self.current_rel_vel_magnitude[agent_id][target_id],
 
-                    *ally_lin_vel,
-                    *ally_lin_pos,
+                    *ally_rel_lin_vel,
+                    *ally_rel_lin_pos,
 
                     *ang_vel_target,
                     *ang_pos_target,
-                    *lin_vel_target,
-                    *lin_pos_target,
+                    *lin_rel_vel_target,
+                    *lin_rel_pos_target,
                     hit_probability,
                 ]
             )
@@ -307,9 +321,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 # reward for closing the distance
                 self.rew_closing_distance[agent_id] = np.clip(
                     self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=-10.0,
+                    a_min=0.0,
                     a_max=None,
-                ) * self.chasing[agent_id][target_id]
+                )
 
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
 
@@ -319,9 +333,19 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
                 # self.rew_close_to_target[agent_id] = - exploding_distance / (self.initial_distance - 0.11)
 
+                self.rew_speed_magnitude[agent_id] = (
+                                        self.current_rel_vel_magnitude[agent_id][target_id] - self.previous_rel_vel_magnitude[agent_id][target_id]) * (
+                                        self.in_range[agent_id][target_id]
+                                        * self.in_cone[agent_id][target_id]
+                                        )
+
+
+
             self.rewards[agent_id] += (
-                                  self.rew_closing_distance[agent_id]
-                                  + self.rew_close_to_target[agent_id]  * self.reward_coef * (1 - self.step_count / self.max_steps)  # regularizations
+                                      self.rew_closing_distance[agent_id]
+                                      + self.rew_close_to_target[agent_id] * self.distance_factor
+                                      + self.rew_speed_magnitude[agent_id] * self.speed_factor
+
             )
 
     @staticmethod

@@ -1,0 +1,63 @@
+train_desc=' Include the explosion radius (0.5) in the reward computation to incentivize collission and negative reward for current distance. \n                            \n                if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps\n\n                # reward for closing the distance\n                self.rew_closing_distance[agent_id] = np.clip(\n                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],\n                    a_min=-10.0,\n                    a_max=None,\n                ) * self.chasing[agent_id][target_id]\n\n                \n\n                exploding_distance = self.current_distance[agent_id][target_id] - 0.5\n\n                self.rew_close_to_target[agent_id] = - exploding_distance\n                 \n                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance\n                #                                 if exploding_distance > 0\n                #                                 else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a\n\n\n            self.rewards[agent_id] += (\n                    self.rew_closing_distance[agent_id]\n                    + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations\n\n            )\n\n'
+__file__='C:\\projects\\pyflyt-kamikazes\\apps\\resume_train.py'
+model.start_datetime=2024-01-08 04:09:19.548887
+elapsed_time=1:25:57.474398
+model_name=ma_quadx_chaser-1000000.zip
+model_name=ma_quadx_chaser-2001472
+model.num_timesteps=2002944
+lw_stand_still=True
+device=device(type='cuda')
+seed=0
+batch_size=1024
+model.learning_rate=0.0001
+discount_factor=0.98
+nn_t=[256, 256, 512]
+num_cpus=1
+num_vec_envs=1
+model.n_envs=1
+model.n_steps=2048
+model.n_epochs=10
+model.batch_size=1024
+random_respawn=True
+spawn_settings={'lw_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_center_bounds': 5.0, 'lm_spawn_radius': 10.0, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 1}
+completion_datetime=2024-01-08 05:35:17.023285
+model.action_space=Box(-10.0, 10.0, (4,), float64)
+model.observation_space=Box(-inf, inf, (40,), float64)
+env_kwargs={'start_pos': array([[-5.69154051,  5.75366968,  6.4705705 ],
+       [ 6.61442189, -3.82939298,  9.98871668]]), 'start_orn': array([[-0.20229064, -0.29059943, -2.64750974],
+       [ 0.        ,  0.        ,  0.        ]]), 'formation_center': [5.614421893063666, -3.829392981252706, 9.98871667622858], 'flight_dome_size': 39.0, 'seed': None, 'spawn_settings': {'lw_center_bounds': 10.0, 'lw_spawn_radius': 1.0, 'lm_center_bounds': 5.0, 'lm_spawn_radius': 10.0, 'min_z': 1.0, 'seed': None, 'num_lw': 1, 'num_lm': 1}, 'num_lm': 1, 'num_lw': 1, 'max_duration_seconds': 30, 'reward_coef': 1.0, 'lw_stand_still': True, 'rew_exploding_target': 1000}
+train_kwargs={'device': device(type='cuda'), 'batch_size': 1024, 'lr': 0.0001, 'discount_factor': 0.98, 'nn_t': [256, 256, 512], 'num_vec_envs': 1}
+model.policy_kwargs={'net_arch': {'pi': [256, 256, 512], 'vf': [256, 256, 512]}}
+model.policy=ActorCriticPolicy(
+  (features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (pi_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (vf_features_extractor): FlattenExtractor(
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+  )
+  (mlp_extractor): MlpExtractor(
+    (policy_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=512, bias=True)
+      (5): Tanh()
+    )
+    (value_net): Sequential(
+      (0): Linear(in_features=40, out_features=256, bias=True)
+      (1): Tanh()
+      (2): Linear(in_features=256, out_features=256, bias=True)
+      (3): Tanh()
+      (4): Linear(in_features=256, out_features=512, bias=True)
+      (5): Tanh()
+    )
+  )
+  (action_net): Linear(in_features=512, out_features=4, bias=True)
+  (value_net): Linear(in_features=512, out_features=1, bias=True)
+)
+model.policy_aliases={'MlpPolicy': <class 'stable_baselines3.common.policies.ActorCriticPolicy'>, 'CnnPolicy': <class 'stable_baselines3.common.policies.ActorCriticCnnPolicy'>, 'MultiInputPolicy': <class 'stable_baselines3.common.policies.MultiInputActorCriticPolicy'>}
+model.policy_class=<class 'stable_baselines3.common.policies.ActorCriticPolicy'>

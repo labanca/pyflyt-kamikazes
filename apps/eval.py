@@ -53,7 +53,11 @@ def eval(env_fn, n_eval_episodes: int = 100, num_vec_envs: int =1, model_name: s
 
     output = dict(
         ep_mean_rew=float(np.array(rewards).mean()),
+        ep_max_rew=float(max(rewards)),
+        ep_min_rew=float(min(rewards)),
         ep_mean_len=float(np.array(lengths).mean()),
+        ep_max_len=float(max(lengths)),
+        ep_min_len=float(min(lengths)),
         reward=[float(r) for r in rewards],
         lengths=[int(i) for i in lengths],
 
@@ -89,6 +93,7 @@ if __name__ == "__main__":
     env_kwargs['max_duration_seconds'] = 30.0
     env_kwargs['reward_coef'] = 1.0
     env_kwargs['lw_stand_still'] = True
+    env_kwargs['rew_exploding_target'] = 1000
 
 
     counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'mission_complete': 0, 'ally_collision': 0,
