@@ -1,17 +1,19 @@
 """Base Multiagent QuadX Environment."""
 from __future__ import annotations
 
-import math
 from copy import deepcopy
 from typing import Any
+from modules.utils import *
 
 import numpy as np
 import pybullet as p
+
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
 
 from PyFlyt.core import Aviary
 from modules.lwsfm import LWManager
+
 
 class MAQuadXBaseEnv(ParallelEnv):
     """MAQuadXBaseEnv."""
@@ -43,9 +45,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         num_lm: int = 1,
         num_lw: int = 1,
         distance_factor: float = 1.0,
+        proximity_factor: float = 1.0,
         speed_factor: float = 1.0,
         rew_exploding_target: float = 100,
         max_velocity_magnitude: float = 10,
+        save_step_data: bool = False
     ):
         """__init__.
 
@@ -83,7 +87,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             )
 
         # action space flight_mode 6: vx, vy, vr, vz
-        thrust_limit = 1
+        thrust_limit = 10
         high = np.array(
             [
                 thrust_limit,
@@ -139,7 +143,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.seed = seed
         self.rewards_data = []
 
-        """ TRAINING PARAMETERS"""
+        """TRAINING PARAMETERS"""
         self.start_pos = start_pos
         self.start_orn = start_orn
         self.spawn_settings = spawn_settings
@@ -148,6 +152,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.lethal_distance = 2.0
         self.lethal_angle = 0.15
         self.distance_factor = distance_factor
+        self.proximity_factor = proximity_factor
         self.speed_factor = speed_factor
         self.lw_stand_still = lw_stand_still
         self.lw_chases = lw_chases
@@ -155,11 +160,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.lw_attacks = lw_attacks
         self.lw_threat_radius = lw_threat_radius
         self.lw_shoot_range = lw_shoot_range
-
         self.rew_exploding_target = rew_exploding_target
         self.max_velocity_magnitude = max_velocity_magnitude
+        self.save_step_data = save_step_data,
 
-        """" PETTINGZOO """
+        """ PETTINGZOO """
         self.num_drones = len(start_pos)
         self.formation_center = formation_center
 
@@ -250,7 +255,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         np_random = np.random.RandomState(seed=seed)
 
         if self.spawn_settings is not None:
-            self.start_pos, self.start_orn, self.formation_center = self.generate_start_pos_orn(**self.spawn_settings)
+            self.start_pos, self.start_orn, self.formation_center = generate_start_pos_orn(**self.spawn_settings)
 
         self.agents = self.possible_agents[:]
         self.targets = self.possible_targets[:]
@@ -536,7 +541,9 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_acc_rew[ag] += rew
                 self.current_inf[ag] = {**infos[ag], **info}
                 self.current_obs[ag] = observations[ag]
-                #self.save_step_data(ag)
+                if self.save_step_data:
+                    self.append_step_data(ag)
+
 
 
         # increment step count and cull dead agents for the next round
@@ -610,50 +617,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
 
-    @staticmethod
-    def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0, num_lw=3, min_z=1.0,
-                               lm_center_bounds=5, lm_spawn_radius=10, num_lm=3,):
-
-        np_random = np.random.RandomState(seed=seed)
-        lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_center_bounds),
-                               np.random.uniform(-lw_center_bounds, lw_center_bounds),
-                               np.random.uniform(min_z, lw_center_bounds + min_z)]
-
-        start_pos_lw = LWManager.generate_formation_pos(lw_formation_center, num_lw, lw_spawn_radius)
-        start_orn_lw = np.zeros_like(start_pos_lw)
-
-        lm_spawn_center = [np.random.uniform(-lm_center_bounds, lm_center_bounds),
-                           np.random.uniform(-lm_center_bounds, lm_center_bounds),
-                           np.random.uniform(min_z, lm_center_bounds + min_z)]
-
-        start_pos_lm = MAQuadXBaseEnv.generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
-                                                                   lm_spawn_center, lm_spawn_radius, num_lm, min_z)
-
-        start_orn_lm = (np_random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
-
-        return np.concatenate([start_pos_lm, start_pos_lw]), np.concatenate([start_orn_lm, start_orn_lw]), lw_formation_center
-
-
-    @staticmethod
-    def generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
-                                    lm_spawn_center, lm_spawn_radius, num_lm,  min_z):
-        # Ensure the formation center and spawn center are NumPy arrays
-        lw_formation_center = np.array(lw_formation_center)
-        lm_spawn_center = np.array(lm_spawn_center)
-
-        # Generate random coordinates within the specified spawn radius and above the minimum z
-        lm_coordinates = []
-        while len(lm_coordinates) < num_lm:
-            x = np.random.uniform(low=lm_spawn_center[0] - lm_spawn_radius, high=lm_spawn_center[0] + lm_spawn_radius)
-            y = np.random.uniform(low=lm_spawn_center[1] - lm_spawn_radius, high=lm_spawn_center[1] + lm_spawn_radius)
-            z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
-
-            # Check if the generated coordinates are outside the exclusion area of the lw formation
-            lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-            if lm_distance >  lw_center_bounds + lw_spawn_radius:
-                lm_coordinates.append([x, y, z])
-
-        return np.array(lm_coordinates)
 
     def get_drone_type(self, agent):
 
@@ -906,7 +869,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         print(f"lin_pos_target: {lin_pos_target}")
 
 
-    def save_step_data(self, agent):
+    def append_step_data(self, agent):
         agent_id = self.agent_name_mapping[agent]
         target_id = self.current_target_id[agent_id]
         step_data = {
@@ -946,3 +909,6 @@ class MAQuadXBaseEnv(ParallelEnv):
             return True
         else:
             return False
+
+
+

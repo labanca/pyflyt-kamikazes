@@ -37,9 +37,8 @@ env_kwargs = dict(
     num_lm=spawn_settings['num_lm'],
     num_lw=spawn_settings['num_lm'],
     max_duration_seconds=30,
-    distance_factor=0.5,
-    speed_factor=1.0,
     lw_moves_random=False,
+    lw_stand_still=True,
     lw_chases=False,
     lw_attacks=False,
     lw_threat_radius=4.0,
@@ -47,6 +46,8 @@ env_kwargs = dict(
     agent_hz=30,
     max_velocity_magnitude=10,
     rew_exploding_target=100,
+    distance_factor=0.5,
+    speed_factor=0.1,
 
 )
 

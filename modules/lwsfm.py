@@ -1,6 +1,6 @@
 import numpy as np
 from PyFlyt.pz_envs.quadx_envs.ma_quadx_hover_env import MAQuadXBaseEnv
-#from envs.ma_quadx_chaser_env import MAQuadXHoverEnv
+from modules.utils import *
 
 class State:
     def __init__(self, lwfsm ):
@@ -138,25 +138,8 @@ class LWManager:
 
 
 
-    @staticmethod
-    def generate_formation_pos( formation_center, num_drones, radius=0.5, min_z = 1.0):
-        # Ensure the formation center is a NumPy array
-        formation_center = np.array(formation_center)
 
-        # Generate angles evenly distributed around a circle
-        angles = np.linspace(0, 2 * np.pi, num_drones, endpoint=False)
 
-        # Calculate drone positions in a radial formation
-        x_positions = formation_center[0] + radius * np.cos(angles)
-        y_positions = formation_center[1] + radius * np.sin(angles)
-
-        # Set z coordinates to zero (you can modify this based on your specific requirements)
-        z_positions = formation_center[2] + np.zeros_like(x_positions)
-
-        # Combine x, y, and z coordinates into a 3D array
-        drone_positions = np.column_stack((x_positions, y_positions, z_positions))
-
-        return np.array(drone_positions)
 
     def get_squad_setpoints(self):
         """
@@ -165,7 +148,7 @@ class LWManager:
         Returns:
         A list of numpy arrays, each representing the setpoint for an individual drone.
         """
-        positions = self.generate_formation_pos(self.env.formation_center, self.env.num_lw)
+        positions = generate_formation_pos(self.env.formation_center, self.env.num_lw)
         setpoints = []
 
         for position in positions:

@@ -1,41 +1,21 @@
+import yaml
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from stable_baselines3 import PPO
+from pathlib import Path
 import numpy as np
-import time
+from modules.utils import *
 
-#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-8438336.zip')
-model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-1024000.zip')
-seed=None
+# model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
+model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-6291456.zip')
+model_name = model_path.stem
+model_folder = model_path.parent
+model = PPO.load(model_path)
 
-#print((os.cpu_count() or 1))
-spawn_settings = dict(
-    lw_center_bounds=5.0,
-    lm_center_bounds=5.0,
-    lw_spawn_radius=1.0,
-    lm_spawn_radius=5.0,
-    min_z=1.0,
-    seed=None,
-    num_lw=1,
-    num_lm=3,
-)
-
-
-env_kwargs = {}
-env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                  + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
-env_kwargs['seed'] = seed
-env_kwargs['spawn_settings'] = spawn_settings
-env_kwargs['num_lm'] = spawn_settings['num_lm']
-env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 15.0
-env_kwargs['distance_factor'] = 1.0
-env_kwargs['speed_factor'] = 10.0
-env_kwargs['lw_stand_still'] = False
-env_kwargs['rew_exploding_target'] = 1000
+params_path = f'{model_folder}/{model_name}.yaml'
+spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
-observations, infos = env.reset(seed=seed)
+observations, infos = env.reset(seed=spawn_settings['seed'])
 
 last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
@@ -44,7 +24,6 @@ first_time = True
 num_games = 1
 
 while env.agents:
-
 
     #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
@@ -75,10 +54,10 @@ while env.agents:
         print(f'{truncations=}\n')
         print(f'{infos=}\n\n\n')
         #time.sleep(5)
-        env.write_step_data('reward_data.csv')
+        if env.save_step_data:
+            env.write_step_data(Path(model_folder, 'run-data', f'{model_name}.csv'))
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
-
 
         #observations, infos = env.reset(seed=seed)
         num_games -= 1
@@ -87,7 +66,6 @@ while env.agents:
     if num_games == 0:
         print(counters)
         break
-
 
 env.close()
 

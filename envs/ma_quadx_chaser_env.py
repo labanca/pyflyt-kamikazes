@@ -5,6 +5,7 @@ import numpy as np
 
 from gymnasium import spaces
 from typing import Any
+from pathlib import Path
 
 
 from envs.ma_quadx_base_env import MAQuadXBaseEnv
@@ -75,9 +76,11 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         num_lm: int = 1,
         num_lw: int = 1,
         distance_factor: float = 1.0,
+        proximity_factor: float = 1.0,
         speed_factor: float = 1.0,
         rew_exploding_target: float = 100,
         max_velocity_magnitude: float = 10,
+        save_step_data: bool = False
     ):
         """__init__.
 
@@ -111,9 +114,12 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             num_lw=num_lw,
             formation_center=formation_center,
             distance_factor=distance_factor,
+            proximity_factor=proximity_factor,
             speed_factor=speed_factor,
             rew_exploding_target=rew_exploding_target,
-            max_velocity_magnitude=max_velocity_magnitude
+            max_velocity_magnitude=max_velocity_magnitude,
+            save_step_data=save_step_data,
+
         )
 
         self.sparse_reward = sparse_reward
@@ -123,7 +129,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 25,),
+            shape=(self.combined_space.shape[0] + 22,),
             dtype=np.float64,
         )
 
@@ -211,7 +217,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 1.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
-        self.hit_probability = 0.9 - self.current_magnitude/self.max_velocity_magnitude
+        self.hit_probability = np.maximum(0.9 - self.current_magnitude/self.max_velocity_magnitude, 0.01)
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
@@ -261,11 +267,14 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
         ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
 
-        if self.lw_manager.squad[target_id - self.num_lm].gun_loaded:
-            hit_probability = max(0.9 - np.linalg.norm(lin_vel)/self.max_velocity_magnitude, 0.01)
+
+        if len(self.targets):
+            if self.lw_manager.squad[target_id - self.num_lm].gun_loaded:
+                hit_probability = self.hit_probability[agent_id]
+            else:
+                hit_probability = 0.0
         else:
             hit_probability = 0.0
-
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -340,7 +349,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         """_compute_engagement_rewards."""
         # reset rewards
         self.rewards[agent_id] *= 0.0
-        ag = self.drone_id_mapping[agent_id]
         target_id = self.find_nearest_lw(agent_id)
         self.current_target_id[agent_id] = target_id # stores targets
 
@@ -350,50 +358,28 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
                 self.rew_closing_distance[agent_id] = np.clip(
-                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=0,
-                    a_max=None,
-                )
-
-
-
-    def _compute_engagement_rewards_old(self, agent_id) -> None:
-        """_compute_engagement_rewards."""
-        # reset rewards
-        self.rewards[agent_id] *= 0.0
-        ag = self.drone_id_mapping[agent_id]
-        target_id = self.find_nearest_lw(agent_id)
-        self.current_target_id[agent_id] = target_id # stores targets
-
-        # sparse reward computation
-        if not self.sparse_reward:
-
-            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
-
-                # reward for closing the distance
-                self.rew_closing_distance[agent_id] = np.clip(
-                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=0.0,
-                    a_max=None,
-                )
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=-10,
+                    a_max=None,)
 
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
                 self.rew_close_to_target[agent_id] = 1 / (exploding_distance
                                                           if exploding_distance > 0
                                                           else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
+                self.rew_speed_magnitude[agent_id] = - (self.hit_probability[agent_id] + 0.05)
 
-                self.rew_speed_magnitude[agent_id] = -(self.hit_probability + 0.05)
+                self.rew_closing_distance[agent_id] *= self.distance_factor
+                self.rew_close_to_target[agent_id] *= self.proximity_factor
+                self.rew_speed_magnitude[agent_id] *= self.speed_factor
 
-
-
-
-            self.rewards[agent_id] += (
+                self.rewards[agent_id] += (
                                       self.rew_closing_distance[agent_id]
-                                      + self.rew_close_to_target[agent_id] * self.distance_factor
-                                      + self.rew_speed_magnitude[agent_id] * self.speed_factor
+                                      + self.rew_close_to_target[agent_id]
+                                      + self.rew_speed_magnitude[agent_id]
+                )
 
-            )
+
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -443,6 +429,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
     def write_step_data(self, filename):
         # write the rewards data to a file
         import csv
+
+        filename.parent.mkdir(parents=True, exist_ok=True)
 
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = [ "aviary_steps", "physics_steps", "step_count", "agent_id", "elapsed_time",

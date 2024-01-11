@@ -1,0 +1,57 @@
+env_kwargs:
+  agent_hz: 30
+  distance_factor: 5.0
+  flight_dome_size: 32.0
+  formation_center:
+  - -2.887448392878394
+  - 9.58902006772935
+  - 8.135027756922952
+  lw_attacks: false
+  lw_chases: false
+  lw_moves_random: false
+  lw_shoot_range: 1.0
+  lw_stand_still: true
+  lw_threat_radius: 4.0
+  max_duration_seconds: 30
+  max_velocity_magnitude: 10.0
+  num_lm: 1
+  num_lw: 1
+  proximity_factor: 0.2
+  rew_exploding_target: 300.0
+  save_step_data: false
+  seed: null
+  spawn_settings: &id001
+    lm_center_bounds: 5.0
+    lm_spawn_radius: 15.0
+    lw_center_bounds: 10.0
+    lw_spawn_radius: 2.0
+    min_z: 0.5
+    num_lm: 1
+    num_lw: 1
+    seed: null
+  speed_factor: 0.0
+  start_orn:
+  - - 0.19686849859825717
+    - -0.9068799838074646
+    - 3.4414448218572193
+  - - 0.0
+    - 0.0
+    - 0.0
+  start_pos:
+  - - -2.81030511616912
+    - -16.62630683773844
+    - 6.789192071601425
+  - - -0.8874483928783938
+    - 9.58902006772935
+    - 8.135027756922952
+spawn_settings: *id001
+train_kwargs:
+  batch_size: 512
+  device: cuda
+  discount_factor: 0.99
+  lr: 0.001
+  nn_t:
+  - 128
+  - 128
+  - 128
+  num_vec_envs: 16

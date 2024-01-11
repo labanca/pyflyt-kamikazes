@@ -48,16 +48,18 @@ class TensorboardCallback(BaseCallback):
     #def __init__(self, env, verbose=0):
         #super().__init__(verbose)
 
-    def init(self, verbose=0):
-        super().init(verbose)
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+        #super().init(verbose)
+        self.mean_rew_vec_envs = 0
 
     def _on_step(self) -> bool:
 
-        mean_rew_vec_envs = np.array([rew for rew in self.locals['rewards']]).mean()
-        self.logger.record("rew_vec_envs", mean_rew_vec_envs)
+        self.mean_rew_vec_envs += self.locals['rewards']
+        #self.logger.record("rew_vec_envs", self.mean_rew_vec_envs)
 
         if self.num_timesteps % (self.model.n_steps) == 0:
-            pass
+            self.logger.record("rew_vec_envs", sum(self.mean_rew_vec_envs)/self.training_env.num_envs)
             #self.logger.dump(self.num_timesteps)
-
+            self.mean_rew_vec_envs = 0
         return True
