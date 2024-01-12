@@ -1,6 +1,31 @@
 import numpy as np
 import yaml
+import csv
 
+
+def yaml_to_csv(yaml_file, csv_file):
+    try:
+        with open(yaml_file, 'r') as yaml_stream:
+            yaml_data = yaml.safe_load(yaml_stream)
+
+        if not yaml_data:
+            raise ValueError("YAML data is empty or invalid.")
+
+        fieldnames = yaml_data.keys()
+
+        with open(csv_file, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
+
+            # Write the data
+            writer.writerow(yaml_data)
+
+        print(f"Conversion successful. CSV file saved as {csv_file}")
+
+    except Exception as e:
+        print(f"Error: {e}")
 
 def read_yaml_file(file_path):
     with open(file_path, 'r') as file:

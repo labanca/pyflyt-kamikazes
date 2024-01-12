@@ -71,6 +71,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         lw_attacks: bool = False,
         lw_threat_radius: float = 4.0,
         lw_shoot_range: float = 1.0,
+        lethal_angle: float = 0.15,
+        lethal_distance: float = 2.0,
         agent_hz: int = 30,
         max_duration_seconds: float = 30.0,
         num_lm: int = 1,
@@ -119,6 +121,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             rew_exploding_target=rew_exploding_target,
             max_velocity_magnitude=max_velocity_magnitude,
             save_step_data=save_step_data,
+            lethal_angle=lethal_angle,
+            lethal_distance=lethal_distance,
 
         )
 
@@ -213,8 +217,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 self.current_vel_angles[id][i] = np.arccos(cosines)
 
         self.current_vel_angles = self.current_vel_angles.T
-        self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.15
-        self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 1.0
+        self.in_cone = np.array(self.current_vel_angles < self.lethal_angle)  # lethal angle = 0.15
+        self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
         self.hit_probability = np.maximum(0.9 - self.current_magnitude/self.max_velocity_magnitude, 0.01)
@@ -357,17 +361,23 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
-                self.rew_closing_distance[agent_id] = np.clip(
-                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
-                    a_min=-10,
-                    a_max=None,)
+                # self.rew_closing_distance[agent_id] = np.clip(
+                #     (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                #     a_min=-10,
+                #     a_max=None,)
 
-                exploding_distance = self.current_distance[agent_id][target_id] - 0.5
-                self.rew_close_to_target[agent_id] = 1 / (exploding_distance
-                                                          if exploding_distance > 0
-                                                          else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
-                self.rew_speed_magnitude[agent_id] = - (self.hit_probability[agent_id] + 0.05)
+                self.rew_closing_distance[agent_id] = 1/(self.current_vel_angles[agent_id][target_id] + 0.09)
+                # exploding_distance = self.current_distance[agent_id][target_id] - 0.5
+                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
+                #                                           if exploding_distance > 0
+                #                                           else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
+                #
+                # self.rew_speed_magnitude[agent_id] = (self.rew_closing_distance[agent_id]
+                #                                       * self.in_range[agent_id][target_id]
+                #                                       * self.in_cone[agent_id][target_id]
+                #                                       * 100.0
+                #                                       )
 
                 self.rew_closing_distance[agent_id] *= self.distance_factor
                 self.rew_close_to_target[agent_id] *= self.proximity_factor
@@ -378,6 +388,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                                       + self.rew_close_to_target[agent_id]
                                       + self.rew_speed_magnitude[agent_id]
                 )
+
 
 
 

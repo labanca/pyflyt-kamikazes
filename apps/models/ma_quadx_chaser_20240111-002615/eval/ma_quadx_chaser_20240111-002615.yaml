@@ -1,0 +1,110 @@
+ma_quadx_chaser-1048576.zip:
+  ep_mean_rew: 349.87327014136827
+  ep_max_rew: 349.87327014136827
+  ep_min_rew: 349.87327014136827
+  ep_mean_len: 228.0
+  ep_max_len: 228.0
+  ep_min_len: 228.0
+  reward:
+  - 349.87327014136827
+  lengths:
+  - 228
+ma_quadx_chaser-10485760.zip:
+  ep_mean_rew: 2570.010498171905
+  ep_max_rew: 2570.010498171905
+  ep_min_rew: 2570.010498171905
+  ep_mean_len: 87.0
+  ep_max_len: 87.0
+  ep_min_len: 87.0
+  reward:
+  - 2570.010498171905
+  lengths:
+  - 87
+ma_quadx_chaser-2097152.zip:
+  ep_mean_rew: 641.7375083798543
+  ep_max_rew: 641.7375083798543
+  ep_min_rew: 641.7375083798543
+  ep_mean_len: 132.0
+  ep_max_len: 132.0
+  ep_min_len: 132.0
+  reward:
+  - 641.7375083798543
+  lengths:
+  - 132
+ma_quadx_chaser-3145728.zip:
+  ep_mean_rew: 1782.1209612508537
+  ep_max_rew: 1782.1209612508537
+  ep_min_rew: 1782.1209612508537
+  ep_mean_len: 225.0
+  ep_max_len: 225.0
+  ep_min_len: 225.0
+  reward:
+  - 1782.1209612508537
+  lengths:
+  - 225
+ma_quadx_chaser-4194304.zip:
+  ep_mean_rew: 2542.7602254995145
+  ep_max_rew: 2542.7602254995145
+  ep_min_rew: 2542.7602254995145
+  ep_mean_len: 79.0
+  ep_max_len: 79.0
+  ep_min_len: 79.0
+  reward:
+  - 2542.7602254995145
+  lengths:
+  - 79
+ma_quadx_chaser-5242880.zip:
+  ep_mean_rew: 2220.8684697151184
+  ep_max_rew: 2220.8684697151184
+  ep_min_rew: 2220.8684697151184
+  ep_mean_len: 78.0
+  ep_max_len: 78.0
+  ep_min_len: 78.0
+  reward:
+  - 2220.8684697151184
+  lengths:
+  - 78
+ma_quadx_chaser-6291456.zip:
+  ep_mean_rew: 779.6774059385061
+  ep_max_rew: 779.6774059385061
+  ep_min_rew: 779.6774059385061
+  ep_mean_len: 68.0
+  ep_max_len: 68.0
+  ep_min_len: 68.0
+  reward:
+  - 779.6774059385061
+  lengths:
+  - 68
+ma_quadx_chaser-7340032.zip:
+  ep_mean_rew: 454.6018545757979
+  ep_max_rew: 454.6018545757979
+  ep_min_rew: 454.6018545757979
+  ep_mean_len: 83.0
+  ep_max_len: 83.0
+  ep_min_len: 83.0
+  reward:
+  - 454.6018545757979
+  lengths:
+  - 83
+ma_quadx_chaser-8388608.zip:
+  ep_mean_rew: 2237.8560591312125
+  ep_max_rew: 2237.8560591312125
+  ep_min_rew: 2237.8560591312125
+  ep_mean_len: 89.0
+  ep_max_len: 89.0
+  ep_min_len: 89.0
+  reward:
+  - 2237.8560591312125
+  lengths:
+  - 89
+ma_quadx_chaser-9437184.zip:
+  ep_mean_rew: 2117.8246079832315
+  ep_max_rew: 2117.8246079832315
+  ep_min_rew: 2117.8246079832315
+  ep_mean_len: 138.0
+  ep_max_len: 138.0
+  ep_min_len: 138.0
+  reward:
+  - 2117.8246079832315
+  lengths:
+  - 138

@@ -6,13 +6,18 @@ import numpy as np
 from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
-model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-6291456.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240111-202839/ma_quadx_chaser-3145728.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
 
 params_path = f'{model_folder}/{model_name}.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+
+# spawn_settings['num_lm'] = 3
+# env_kwargs['num_lm'] = 3
+# env_kwargs['spawn_settings'] = spawn_settings
+# env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(**spawn_settings)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=spawn_settings['seed'])

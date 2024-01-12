@@ -134,19 +134,19 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """testing speed factor."""
+    train_desc = """testing onyl rew_distance and vel_angles as reward."""
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240107-202245'
+    model_dir = 'ma_quadx_chaser_20240111-105852'
     model_name = 'a'
 
-    steps = 1024 * 1024
+    steps = 1024 * 1024 * 1
 
-    num_resumes = 40
-    reset_model = True
+    num_resumes = 1
+    reset_model = False
 
     for i in range(num_resumes):
 
@@ -158,33 +158,43 @@ if __name__ == "__main__":
         save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
-        if i == 9:
-            env_kwargs['num_lm'] = 3
-            spawn_settings['num_lm'] = 3
-            env_kwargs['spawn_settings'] = spawn_settings
 
-            if reset_model:
-                model_name = 'a'
+        #env_kwargs['distance_factor'] += 5
 
-        if i == 19:
-            env_kwargs['num_lm'] = 9
-            spawn_settings['num_lm'] = 9
-            env_kwargs['num_lw'] = 3
-            spawn_settings['num_lw'] = 3
-            env_kwargs['spawn_settings'] = spawn_settings
 
-            if reset_model:
-                model_name = 'a'
-
-        if i == 29:
-            env_kwargs['num_lm'] = 15
-            spawn_settings['num_lm'] = 15
-            env_kwargs['num_lw'] = 5
-            spawn_settings['num_lw'] = 5
-            env_kwargs['spawn_settings'] = spawn_settings
-
-            if reset_model:
-                model_name = 'a'
+        # if i == 4:
+        #     env_kwargs['num_lm'] = 3
+        #     spawn_settings['num_lm'] = 3
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
+        #         **spawn_settings)
+        #
+        #     if reset_model:
+        #         model_name = 'a'
+        #
+        # if i == 9:
+        #     env_kwargs['num_lm'] = 9
+        #     spawn_settings['num_lm'] = 9
+        #     env_kwargs['num_lw'] = 3
+        #     spawn_settings['num_lw'] = 3
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
+        #         **spawn_settings)
+        #
+        #     if reset_model:
+        #         model_name = 'a'
+        #
+        # if i == 14:
+        #     env_kwargs['num_lm'] = 15
+        #     spawn_settings['num_lm'] = 15
+        #     env_kwargs['num_lw'] = 5
+        #     spawn_settings['num_lw'] = 5
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
+        #         **spawn_settings)
+        #
+        #     if reset_model:
+        #         model_name = 'a'
 
 
 

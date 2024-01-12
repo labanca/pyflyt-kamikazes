@@ -39,12 +39,14 @@ env_kwargs:
   lw_attacks: false
   lw_threat_radius: 4.0
   lw_shoot_range: 1.0
+  lethal_angle: 0.15
+  lethal_distance: 3.0
   agent_hz: 15
   max_velocity_magnitude: 10.0
   rew_exploding_target: 300.0
-  distance_factor: 10.0
+  distance_factor: 1.0
   proximity_factor: 0.2
-  speed_factor: 0.1
+  speed_factor: 1.0
   save_step_data: false
 
 train_kwargs:

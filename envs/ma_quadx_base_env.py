@@ -38,8 +38,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         lw_moves_random: bool = False,
         lw_chases: bool = False,
         lw_attacks: bool = False,
-        lw_threat_radius=4.0,
-        lw_shoot_range = 1.0,
+        lw_threat_radius: float = 4.0,
+        lw_shoot_range: float = 1.0,
+        lethal_angle: float = 0.15,
+        lethal_distance: float = 2.0,
         agent_hz: int = 30,
         max_duration_seconds: float = 30.0,
         num_lm: int = 1,
@@ -149,8 +151,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.spawn_settings = spawn_settings
         self.num_lm = self.spawn_settings['num_lm'] if spawn_settings else num_lm
         self.num_lw = self.spawn_settings['num_lw'] if spawn_settings else num_lw
-        self.lethal_distance = 2.0
-        self.lethal_angle = 0.15
+        self.lethal_distance = lethal_distance
+        self.lethal_angle = lethal_angle
         self.distance_factor = distance_factor
         self.proximity_factor = proximity_factor
         self.speed_factor = speed_factor
@@ -282,10 +284,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.attitudes= np.zeros((self.num_drones, 4,3), dtype=np.float64)
         self.drone_positions = np.zeros((self.num_drones, 3), dtype=np.float64)
 
-
-        self.in_cone = np.zeros((self.num_drones,self.num_drones), dtype=bool)
-        self.in_range = np.zeros((self.num_drones,self.num_drones), dtype=bool)
-        self.chasing = np.zeros((self.num_drones,self.num_drones), dtype=bool)
+        self.in_cone = np.zeros((self.num_drones, self.num_drones), dtype=bool)
+        self.in_range = np.zeros((self.num_drones, self.num_drones), dtype=bool)
+        self.chasing = np.zeros((self.num_drones, self.num_drones), dtype=bool)
 
         self.previous_magnitude = np.zeros(self.num_drones, dtype=np.float64)
         self.current_magnitude = np.zeros(self.num_drones, dtype=np.float64)
@@ -310,8 +311,6 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
-
-
 
         self.squad_id_mapping = {}
 
@@ -349,6 +348,9 @@ class MAQuadXBaseEnv(ParallelEnv):
                                  threat_radius=self.lw_threat_radius,
                                  shoot_range=self.lw_shoot_range,
                                  )
+
+        self.aviary.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=90, cameraPitch=0,
+                                            cameraTargetPosition=self.formation_center)
 
         # wait for env to stabilize
         for _ in range(10):
