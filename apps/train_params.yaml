@@ -44,9 +44,9 @@ env_kwargs:
   agent_hz: 15
   max_velocity_magnitude: 10.0
   rew_exploding_target: 300.0
-  distance_factor: 1.0
+  distance_factor: 0.0
   proximity_factor: 0.2
-  speed_factor: 1.0
+  speed_factor: 0.0
   save_step_data: false
 
 train_kwargs:

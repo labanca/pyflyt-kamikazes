@@ -7,7 +7,7 @@ from gymnasium.utils import EzPickle
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import configure
 from pathlib import Path
-from modules.utils import yaml_to_csv
+from modules.utils import save_agg_dict_to_csv, save_dict_to_csv
 
 import supersuit as ss
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 'exploded_by_ally': 0, 'downed': 0}
 
     n_eval_episodes = 100
-    model_dir = 'ma_quadx_chaser_20240111-202839'
+    model_dir = 'ma_quadx_chaser_20240112-013125'
     root_path = Path('apps/models')
     model_folder = Path.joinpath(root_path, model_dir)
     files_paths = glob.glob(f"{model_folder}/*.zip")
@@ -98,16 +98,15 @@ if __name__ == "__main__":
         result_dict = eval(env_fn, n_eval_episodes=n_eval_episodes, num_vec_envs=1, model_name=file,  **env_kwargs)
 
         agg_results = {key: value for key, value in result_dict.items() if key not in ['reward', 'lengths']}
-
         yaml_model_filename = Path(model_folder, 'eval', model_name.split('.')[0] +".yaml")
         save_dict_to_yaml(agg_results, yaml_model_filename)
-
-        yaml_to_csv(yaml_model_filename, str(yaml_model_filename).split('.')[0] + '.csv')
-
+        #save_dict_to_csv(agg_results, str(yaml_model_filename).split('.')[0] + '.csv')
         data[model_name] = {**result_dict}
 
     final_yaml_filename = Path(model_folder, 'eval', "agg-" + model_dir + ".yaml")
+    final_csv_filename = Path(model_folder, 'eval', "agg-" + model_dir + ".csv")
     save_dict_to_yaml(data, final_yaml_filename)
+    save_agg_dict_to_csv(data, final_csv_filename)
 
 
 

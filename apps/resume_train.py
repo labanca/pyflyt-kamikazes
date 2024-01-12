@@ -134,7 +134,7 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """testing onyl rew_distance and vel_angles as reward."""
+    train_desc = """1/vel_angles * approaching and in_range in_cone magnitude diff * 10 as reward."""
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
@@ -145,8 +145,8 @@ if __name__ == "__main__":
 
     steps = 1024 * 1024 * 1
 
-    num_resumes = 1
-    reset_model = False
+    num_resumes = 9
+    reset_model = True
 
     for i in range(num_resumes):
 
@@ -159,7 +159,16 @@ if __name__ == "__main__":
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
 
-        #env_kwargs['distance_factor'] += 5
+        if i == 2:
+            env_kwargs['proximity_factor'] = 0.5
+            if reset_model:
+                 model_name = 'a'
+
+        if i == 5:
+            env_kwargs['proximity_factor'] = 1.0
+            if reset_model:
+                 model_name = 'a'
+
 
 
         # if i == 4:

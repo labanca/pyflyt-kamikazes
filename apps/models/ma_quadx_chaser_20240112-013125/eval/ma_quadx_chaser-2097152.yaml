@@ -1,0 +1,8 @@
+ep_mean_rew: 6827.373529680669
+ep_max_rew: 13083.535227298737
+ep_min_rew: 3435.1037409305573
+ep_std_rew: 2001.6861406358744
+ep_mean_len: 188.17
+ep_max_len: 228.0
+ep_min_len: 99.0
+ep_std_len: 40.29840071268338

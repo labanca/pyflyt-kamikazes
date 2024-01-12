@@ -6,7 +6,7 @@ import numpy as np
 from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
-model_path = Path('apps/models/ma_quadx_chaser_20240111-202839/ma_quadx_chaser-3145728.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240112-144537/ma_quadx_chaser-1048576.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)

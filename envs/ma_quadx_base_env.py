@@ -349,7 +349,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                                  shoot_range=self.lw_shoot_range,
                                  )
 
-        self.aviary.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=90, cameraPitch=0,
+        self.aviary.resetDebugVisualizerCamera(cameraDistance=2, cameraYaw=90, cameraPitch=0,
                                             cameraTargetPosition=self.formation_center)
 
         # wait for env to stabilize

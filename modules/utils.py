@@ -3,15 +3,26 @@ import yaml
 import csv
 
 
-def yaml_to_csv(yaml_file, csv_file):
-    try:
-        with open(yaml_file, 'r') as yaml_stream:
-            yaml_data = yaml.safe_load(yaml_stream)
+def save_agg_dict_to_csv(data, file_path):
+    with open(file_path, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
 
-        if not yaml_data:
-            raise ValueError("YAML data is empty or invalid.")
+        # Write the header
+        header = ["Experiment", "ep_mean_rew", "ep_max_rew", "ep_min_rew", "ep_std_rew",
+                  "ep_mean_len", "ep_max_len", "ep_min_len", "ep_std_len"]
+        csv_writer.writerow(header)
 
-        fieldnames = yaml_data.keys()
+        # Write the data
+        for experiment, values in data.items():
+            row = [experiment,
+                   values["ep_mean_rew"], values["ep_max_rew"], values["ep_min_rew"], values["ep_std_rew"],
+                   values["ep_mean_len"], values["ep_max_len"], values["ep_min_len"], values["ep_std_len"]]
+            csv_writer.writerow(row)
+
+
+def save_dict_to_csv(data, csv_file):
+
+        fieldnames = data.keys()
 
         with open(csv_file, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -20,12 +31,10 @@ def yaml_to_csv(yaml_file, csv_file):
             writer.writeheader()
 
             # Write the data
-            writer.writerow(yaml_data)
+            writer.writerow(data)
 
-        print(f"Conversion successful. CSV file saved as {csv_file}")
 
-    except Exception as e:
-        print(f"Error: {e}")
+
 
 def read_yaml_file(file_path):
     with open(file_path, 'r') as file:
@@ -99,7 +108,7 @@ def generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_
 
         # Check if the generated coordinates are outside the exclusion area of the lw formation
         lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-        if lm_distance >  lw_center_bounds + lw_spawn_radius:
+        if lm_distance > lw_center_bounds:
             lm_coordinates.append([x, y, z])
 
     return np.array(lm_coordinates)

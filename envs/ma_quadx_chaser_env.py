@@ -361,23 +361,13 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
-                # self.rew_closing_distance[agent_id] = np.clip(
-                #     (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
-                #     a_min=-10,
-                #     a_max=None,)
 
+                # if the 1 is to hight the kamikazes will circle the enemy. try a
+                exploding_distance = self.current_distance[agent_id][target_id] - 0.5
+                self.rew_close_to_target[agent_id] = (1 / (exploding_distance
+                                                          if exploding_distance > 0
+                                                          else 0.09)) * self.approaching[agent_id][target_id]
 
-                self.rew_closing_distance[agent_id] = 1/(self.current_vel_angles[agent_id][target_id] + 0.09)
-                # exploding_distance = self.current_distance[agent_id][target_id] - 0.5
-                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
-                #                                           if exploding_distance > 0
-                #                                           else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
-                #
-                # self.rew_speed_magnitude[agent_id] = (self.rew_closing_distance[agent_id]
-                #                                       * self.in_range[agent_id][target_id]
-                #                                       * self.in_cone[agent_id][target_id]
-                #                                       * 100.0
-                #                                       )
 
                 self.rew_closing_distance[agent_id] *= self.distance_factor
                 self.rew_close_to_target[agent_id] *= self.proximity_factor
