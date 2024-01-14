@@ -204,6 +204,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # relative ground relative velocities and ground relative magnitude
         self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
+        self.current_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
@@ -232,7 +233,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         Returns:
             np.ndarray:
 
-       attitude is (4, 3) array, where:
+        attitude is (4, 3) array, where:
             - `state[0, :]` represents body frame angular velocity
             - `state[1, :]` represents ground frame angular position
             - `state[2, :]` represents body frame linear velocity
@@ -263,13 +264,21 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_ang_vel = target_ang_vel # unchanged
         target_delta_ang_pos = ang_pos - target_ang_pos
         target_delta_lin_vel = np.matmul((target_lin_vel - lin_vel), agent_rotation)
-        target_distance = float(np.linalg.norm(target_delta_lin_pos))
+        target_distance = float(np.linalg.norm(target_delta_lin_pos)) - 0.5
 
-        ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
-        ally_ang_vel = ally_ang_vel  # unchanged
-        ally_delta_ang_pos = ang_pos - ally_ang_pos
-        ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
-        ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
+
+        if near_ally_id == -1:
+            ally_delta_lin_pos = np.array([False, False, False])
+            ally_ang_vel = np.array([False, False, False])
+            ally_delta_ang_pos = np.array([False, False, False])
+            ally_delta_lin_vel = np.array([False, False, False])
+            ally_distance = False
+        else:
+            ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
+            ally_ang_vel = ally_ang_vel  # unchanged
+            ally_delta_ang_pos = ang_pos - ally_ang_pos
+            ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
+            ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
 
 
         if len(self.targets):
@@ -279,6 +288,25 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 hit_probability = 0.0
         else:
             hit_probability = 0.0
+
+        self.observation_dict = dict(
+            ang_vel=ang_vel,
+            ang_pos=ang_pos,
+            lin_vel=lin_vel,
+            lin_pos=lin_pos,
+            agent_aux_state=agent_aux_state,
+            past_actions=self.past_actions[agent_id],
+            ally_ang_vel=ally_ang_vel,
+            ally_delta_ang_pos=ally_delta_ang_pos,
+            ally_delta_lin_vel=ally_delta_lin_vel,
+            ally_delta_lin_pos=ally_delta_lin_pos,
+            target_ang_vel=target_ang_vel,
+            target_delta_ang_pos=target_delta_ang_pos,
+            target_delta_lin_vel=target_delta_lin_vel,
+            target_delta_lin_pos=target_delta_lin_pos,
+            target_distance=target_distance,
+            hit_probability=hit_probability,
+        )
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
@@ -336,7 +364,11 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self, agent_id: int
     ) -> tuple[bool, bool, float, dict[str, Any]]:
         """Computes the termination, truncation, and reward of the current timestep."""
+
+
         term, trunc, reward, info = super().compute_base_term_trunc_reward_info_by_id(agent_id)
+
+
 
         self._compute_engagement_rewards(agent_id)
 
@@ -361,25 +393,27 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=-10,
+                    a_max=None, )
 
-                # if the 1 is to hight the kamikazes will circle the enemy. try a
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
-                self.rew_close_to_target[agent_id] = (1 / (exploding_distance
+                self.rew_close_to_target[agent_id] = 1 / (exploding_distance
                                                           if exploding_distance > 0
-                                                          else 0.09)) * self.approaching[agent_id][target_id]
+                                                          else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
+                self.rew_speed_magnitude[agent_id] = -self.speed_factor
 
                 self.rew_closing_distance[agent_id] *= self.distance_factor
                 self.rew_close_to_target[agent_id] *= self.proximity_factor
                 self.rew_speed_magnitude[agent_id] *= self.speed_factor
 
                 self.rewards[agent_id] += (
-                                      self.rew_closing_distance[agent_id]
-                                      + self.rew_close_to_target[agent_id]
-                                      + self.rew_speed_magnitude[agent_id]
+                        self.rew_closing_distance[agent_id]
+                        + self.rew_close_to_target[agent_id]
+                        + self.rew_speed_magnitude[agent_id]
                 )
-
-
 
 
     @staticmethod
@@ -448,6 +482,28 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             # Write the data
             for step_data in self.rewards_data:
                 writer.writerow(step_data)
+
+    def write_obs_data(self, filename):
+        # write the rewards data to a file
+        import csv
+
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ["ang_vel", "ang_pos", "lin_vel", "lin_pos", "agent_aux_state", "past_actions",
+                          "ally_ang_vel", "ally_delta_ang_pos", "ally_delta_lin_vel", "ally_delta_lin_pos",
+                          "target_ang_vel", "target_delta_ang_pos", "target_delta_lin_vel", "target_delta_lin_pos",
+                          "target_distance", "hit_probability"
+                          ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
+
+            # Write the data
+            for obs_data in self.obs_data:
+                writer.writerow(obs_data)
+
 
     def plot_rewards_data(self,filename):
         import pandas as pd

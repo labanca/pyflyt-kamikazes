@@ -89,21 +89,22 @@ class MAQuadXBaseEnv(ParallelEnv):
             )
 
         # action space flight_mode 6: vx, vy, vr, vz
-        thrust_limit = 10
+        self.thrust_limit = 10
+
         high = np.array(
             [
-                thrust_limit,
-                thrust_limit,
-                thrust_limit,
-                thrust_limit,
+                self.thrust_limit,
+                self.thrust_limit,
+                self.thrust_limit,
+                self.thrust_limit,
             ]
         )
         low = np.array(
             [
-                -thrust_limit,
-                -thrust_limit,
-                -thrust_limit,
-                -thrust_limit,
+                -self.thrust_limit,
+                -self.thrust_limit,
+                -self.thrust_limit,
+                -self.thrust_limit,
             ]
         )
         self._action_space = spaces.Box(low=low, high=high, dtype=np.float64)
@@ -144,6 +145,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.angle_representation = 1
         self.seed = seed
         self.rewards_data = []
+        self.obs_data = []
 
         """TRAINING PARAMETERS"""
         self.start_pos = start_pos
@@ -296,6 +298,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.forward_vecs = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.separation = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
+        self.ground_velocities = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
 
         self.previous_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.current_angles = np.zeros((self.num_drones,self.num_drones), dtype=np.float64)
@@ -313,6 +316,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.last_rew_time = -1.0
 
         self.squad_id_mapping = {}
+        self.observation_dict = {}
 
         # rebuild the environment
         self.aviary = Aviary(
@@ -499,6 +503,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
                 self.current_actions[id] = actions[uav]
+                #print(f'{actions[uav]=}')
+                #print(f'{self.current_magnitude[self.agent_name_mapping[uav]]=}')
+                #print(f'{self.ground_velocities[self.agent_name_mapping[uav]]=}')
                 self.aviary.set_setpoint(id, self.current_actions[id])
 
         # observation and rewards dictionary
@@ -545,6 +552,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.current_obs[ag] = observations[ag]
                 if self.save_step_data:
                     self.append_step_data(ag)
+                    self.append_obs_data(self.observation_dict)
 
 
 
@@ -568,6 +576,19 @@ class MAQuadXBaseEnv(ParallelEnv):
         return observations, rewards, terminations, truncations, infos
 
     #------------------------------ Env End ----------------------------------------------------
+
+    def normalize_action(self, action: np.ndarray):
+        """
+        Convert the given command to a setpoint that can be used by the quadcopter's propulsion system.
+        Parameters:
+        - command: The command to be converted. It is composed by:
+            - direction (3d) and magnitude (1d) of the desired velocity in the x, y, and z axes.
+        Returns:
+        - The converted setpoint.
+        """
+
+        return action/self.thrust_limit
+
 
     def compute_collisions(self,ag_id):
 
@@ -870,7 +891,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         print(f"lin_vel_target: {lin_vel_target}")
         print(f"lin_pos_target: {lin_pos_target}")
 
-
     def append_step_data(self, agent):
         agent_id = self.agent_name_mapping[agent]
         target_id = self.current_target_id[agent_id]
@@ -905,6 +925,10 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         }
         self.rewards_data.append(step_data)
+
+    def append_obs_data(self, agent):
+
+        self.obs_data.append(self.observation_dict)
 
     def uav_alive(self, drone_id):
         if drone_id in self.armed_uavs.keys():

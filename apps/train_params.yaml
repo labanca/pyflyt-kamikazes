@@ -1,9 +1,9 @@
 spawn_settings: &spawn_settings
-  lw_center_bounds: 10.0
+  lw_center_bounds: 5.0
   lw_spawn_radius: 2.0
   lm_center_bounds: 10.0
   lm_spawn_radius: 10.0
-  min_z: 0.5
+  min_z: 1
   seed: null
   num_lw: &num_lw 1
   num_lm: &num_lm 1
@@ -41,21 +41,21 @@ env_kwargs:
   lw_shoot_range: 1.0
   lethal_angle: 0.15
   lethal_distance: 3.0
-  agent_hz: 15
+  agent_hz: 30
   max_velocity_magnitude: 10.0
-  rew_exploding_target: 300.0
-  distance_factor: 0.0
-  proximity_factor: 0.2
-  speed_factor: 0.0
+  rew_exploding_target: 100.0
+  distance_factor: 3.0
+  proximity_factor: 0.1
+  speed_factor: 0.1
   save_step_data: false
 
 train_kwargs:
   device: cuda
   batch_size: 512
   lr: 0.001
-  discount_factor: 0.98
+  discount_factor: 0.99
   nn_t:
     - 128
     - 128
-    - 128
-  num_vec_envs: 16
+    - 256
+  num_vec_envs: 32

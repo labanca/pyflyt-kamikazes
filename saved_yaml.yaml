@@ -16,7 +16,7 @@ env_kwargs:
   max_velocity_magnitude: 10.0
   num_lm: 2
   num_lw: 1
-  proximity_factor: 0.5
+  proximity_factor: 0.2
   rew_exploding_target: 100.0
   save_step_data: false
   seed: null

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from stable_baselines3 import PPO
 import numpy as np
@@ -94,7 +96,8 @@ while env.agents:
         print(f'{terminations=} {truncations=}\n')
         print(f'{infos=}\n\n\n')
         time.sleep(0)
-        env.write_step_data('reward_data.csv')
+        env.write_step_data(Path('modules/examples/step_data.csv'))
+        env.write_obs_data(Path('modules/examples/obs_data.csv'))
         #env.plot_rewards_data('reward_data.csv')
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)

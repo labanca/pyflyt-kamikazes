@@ -13,18 +13,18 @@ seed=None
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
     lw_center_bounds=5.0,
-    lm_center_bounds=10.0,
+    lm_center_bounds=100.0,
     lw_spawn_radius=1.0,
     lm_spawn_radius=10,
     min_z=1.0,
     seed=None,
-    num_lw=2,
-    num_lm=3,
+    num_lw=1,
+    num_lm=1,
 )
 
 
 env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [-4, -4, 1],[-7,-7,1], [-12,-7,1], [0, 0, 1], [-10, -10, 1] ])
+env_kwargs['start_pos'] = np.array([ [-4, -4, 1], [0, 0, 1] ])
 env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
 env_kwargs['formation_center'] = np.array([0, 0, 1])
 env_kwargs['flight_dome_size'] =     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
@@ -33,7 +33,7 @@ env_kwargs['seed'] = seed
 env_kwargs['spawn_settings'] = None
 env_kwargs['num_lm'] = spawn_settings['num_lm']
 env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 10
+env_kwargs['max_duration_seconds'] = 30
 env_kwargs['lw_stand_still'] = True
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
@@ -53,9 +53,9 @@ while env.agents:
     #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
 
-    actions['agent_0'] = np.array([3, 3, 0, 0.8]) # np.array([i, i, 0, 0.123*i])
-    actions['agent_1'] = np.array([-4, -4, 0, 0.8])
-    actions['agent_2'] = np.array([5, 2, 0, 0.8])
+    actions['agent_0'] = np.array([20, 0, 0, 0.123*i]) # np.array([i, i, 0, 0.123*i])
+    #actions['agent_1'] = np.array([-1, 0, 0, 0.8])
+    #actions['agent_2'] = np.array([5, 2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])
     i +=1
 
