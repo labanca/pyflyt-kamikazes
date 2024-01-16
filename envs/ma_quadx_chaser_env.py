@@ -82,7 +82,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         speed_factor: float = 1.0,
         rew_exploding_target: float = 100,
         max_velocity_magnitude: float = 10,
-        save_step_data: bool = False
+        save_step_data: bool = False,
+        reward_type: int = 0,
     ):
         """__init__.
 
@@ -123,6 +124,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             save_step_data=save_step_data,
             lethal_angle=lethal_angle,
             lethal_distance=lethal_distance,
+            reward_type=reward_type,
 
         )
 
@@ -222,7 +224,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
         self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         self.approaching = self.current_distance < self.previous_distance
-        self.hit_probability = np.maximum(0.9 - self.current_magnitude/self.max_velocity_magnitude, 0.01)
+        self.hit_probability = np.maximum(0.9 - self.current_rel_vel_magnitude/self.max_velocity_magnitude, 0.01)
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
@@ -241,6 +243,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         """
 
         # ids
+
         target_id = self.find_nearest_lw(agent_id)
         near_ally_id = self.find_nearest_lm(agent_id, exclude_self=True)
 
@@ -264,7 +267,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_ang_vel = target_ang_vel # unchanged
         target_delta_ang_pos = ang_pos - target_ang_pos
         target_delta_lin_vel = np.matmul((target_lin_vel - lin_vel), agent_rotation)
-        target_distance = float(np.linalg.norm(target_delta_lin_pos)) - 0.5
+        target_distance = float(np.linalg.norm(target_delta_lin_pos))
 
 
         if near_ally_id == -1:
@@ -283,13 +286,15 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         if len(self.targets):
             if self.lw_manager.squad[target_id - self.num_lm].gun_loaded:
-                hit_probability = self.hit_probability[agent_id]
+                hit_probability = self.hit_probability[agent_id][target_id]
             else:
                 hit_probability = 0.0
         else:
             hit_probability = 0.0
 
         self.observation_dict = dict(
+            step_count=self.step_count,
+            agent_id=agent_id,
             ang_vel=ang_vel,
             ang_pos=ang_pos,
             lin_vel=lin_vel,
@@ -388,14 +393,16 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_id = self.find_nearest_lw(agent_id)
         self.current_target_id[agent_id] = target_id # stores targets
 
-        # sparse reward computation
-        if not self.sparse_reward:
+
+
+        if self.reward_type == 0:
+
 
             if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
 
                 self.rew_closing_distance[agent_id] = np.clip(
                     (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
-                    a_min=-10,
+                    a_min=0,
                     a_max=None, )
 
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
@@ -403,17 +410,41 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                                                           if exploding_distance > 0
                                                           else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
-                self.rew_speed_magnitude[agent_id] = -self.speed_factor
+                self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
-                self.rew_closing_distance[agent_id] *= self.distance_factor
-                self.rew_close_to_target[agent_id] *= self.proximity_factor
-                self.rew_speed_magnitude[agent_id] *= self.speed_factor
+                self.rew_near_engagement[agent_id] = (self.rew_closing_distance[agent_id]
+                 * self.in_range[agent_id][target_id]
+                 * self.in_cone[agent_id][target_id]
+                 * 100.0
+                 )
 
-                self.rewards[agent_id] += (
-                        self.rew_closing_distance[agent_id]
-                        + self.rew_close_to_target[agent_id]
-                        + self.rew_speed_magnitude[agent_id]
-                )
+
+        elif self.reward_type == 1:
+
+            separation = self.drone_positions[target_id] - self.drone_positions[agent_id]
+            norm = np.linalg.norm(separation)
+
+            direction = separation/(norm if norm > 0 else 1)
+
+            intensity = self.max_velocity_magnitude
+
+            vx, vy, vz = direction * intensity
+            self.desired_vel = np.array([vx, vy, 0, vz])
+            self.rew_speed_magnitude[agent_id] = -np.linalg.norm(self.desired_vel - self.current_actions[agent_id])
+
+
+
+        self.rew_closing_distance[agent_id] *= self.distance_factor
+        self.rew_close_to_target[agent_id] *= self.proximity_factor
+        self.rew_speed_magnitude[agent_id] *= self.speed_factor
+
+
+        self.rewards[agent_id] += (
+                self.rew_closing_distance[agent_id]
+                + self.rew_close_to_target[agent_id]
+                + self.rew_speed_magnitude[agent_id]
+                + self.rew_near_engagement[agent_id]
+        )
 
 
     @staticmethod
@@ -490,7 +521,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         filename.parent.mkdir(parents=True, exist_ok=True)
 
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ["ang_vel", "ang_pos", "lin_vel", "lin_pos", "agent_aux_state", "past_actions",
+            fieldnames = ["step_count", "agent_id", "ang_vel", "ang_pos", "lin_vel", "lin_pos", "agent_aux_state", "past_actions",
                           "ally_ang_vel", "ally_delta_ang_pos", "ally_delta_lin_vel", "ally_delta_lin_pos",
                           "target_ang_vel", "target_delta_ang_pos", "target_delta_lin_vel", "target_delta_lin_pos",
                           "target_distance", "hit_probability"

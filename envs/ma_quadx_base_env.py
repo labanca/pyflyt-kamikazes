@@ -51,7 +51,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         speed_factor: float = 1.0,
         rew_exploding_target: float = 100,
         max_velocity_magnitude: float = 10,
-        save_step_data: bool = False
+        save_step_data: bool = False,
+        reward_type: int = 0,
     ):
         """__init__.
 
@@ -89,7 +90,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             )
 
         # action space flight_mode 6: vx, vy, vr, vz
-        self.thrust_limit = 10
+        self.thrust_limit = 20
+
 
         high = np.array(
             [
@@ -167,6 +169,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.rew_exploding_target = rew_exploding_target
         self.max_velocity_magnitude = max_velocity_magnitude
         self.save_step_data = save_step_data,
+        self.reward_type = reward_type
 
         """ PETTINGZOO """
         self.num_drones = len(start_pos)
@@ -317,6 +320,8 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.squad_id_mapping = {}
         self.observation_dict = {}
+
+        self.desired_vel = np.array([0,0,0,0])
 
         # rebuild the environment
         self.aviary = Aviary(
@@ -500,9 +505,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         # set the new actions and send to aviary
         self.current_actions *= 0.0
 
+
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
-                self.current_actions[id] = actions[uav]
+                self.current_actions[id] =  actions[uav] #rescale actions
                 #print(f'{actions[uav]=}')
                 #print(f'{self.current_magnitude[self.agent_name_mapping[uav]]=}')
                 #print(f'{self.ground_velocities[self.agent_name_mapping[uav]]=}')

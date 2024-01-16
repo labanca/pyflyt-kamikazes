@@ -134,18 +134,18 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ waypoint params but with -speed_factor as constant step penalty """
+    train_desc = """ -1* speed_factor as constant penalty. ally obs fixed, obs target_distance consider explosion radius """
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240111-105852'
-    model_name = 'a'
+    model_dir = 'ma_quadx_chaser_20240115-142614'
+    model_name = 'ma_quadx_chaser-1024000.zip'
 
-    steps = 2048 * 1000
+    steps = 2048 * 500
 
-    num_resumes = 10
+    num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):
@@ -158,9 +158,14 @@ if __name__ == "__main__":
         save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
-        if (i % 3 == 0) and (i != 0):
-            env_kwargs['speed_factor'] += 0.1
 
+
+        # env_kwargs['distance_factor'] +=1
+        #
+        # if i in [9, 19, 29]:
+        #     env_kwargs['speed_factor'] += 0.1
+        #     if reset_model:
+        #         model_name = 'a'
 
 
         # if i == 2:
@@ -175,15 +180,15 @@ if __name__ == "__main__":
 
 
 
-        if i == 25:
-            env_kwargs['num_lm'] = 2
-            spawn_settings['num_lm'] = 2
-            env_kwargs['spawn_settings'] = spawn_settings
-            env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
-                **spawn_settings)
-
-            if reset_model:
-                model_name = 'a'
+        # if i == 25:
+        #     env_kwargs['num_lm'] = 2
+        #     spawn_settings['num_lm'] = 2
+        #     env_kwargs['spawn_settings'] = spawn_settings
+        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
+        #         **spawn_settings)
+        #
+        #     if reset_model:
+        #         model_name = 'a'
 
         # if i == 9:
         #     env_kwargs['num_lm'] = 9

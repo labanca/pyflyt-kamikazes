@@ -1,40 +1,27 @@
+from pathlib import Path
+
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from stable_baselines3 import PPO
 import numpy as np
 import time
 
+from modules.utils import generate_start_pos_orn, read_yaml_file
 
-
-
-
-#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
 seed=None
 
-#print((os.cpu_count() or 1))
-spawn_settings = dict(
-    lw_center_bounds=5.0,
-    lm_center_bounds=100.0,
-    lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
-    min_z=1.0,
-    seed=None,
-    num_lw=1,
-    num_lm=1,
-)
+model_path = Path('apps/models/ma_quadx_chaser_20240115-142614/ma_quadx_chaser-3121152.zip')
+model_name = model_path.stem
+model_folder = model_path.parent
+model = PPO.load(model_path)
 
+params_path = f'apps/train_params.yaml'
+spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-env_kwargs = {}
-env_kwargs['start_pos'] = np.array([ [-4, -4, 1], [0, 0, 1] ])
-env_kwargs['start_orn'] = np.zeros_like(env_kwargs['start_pos'])
-env_kwargs['formation_center'] = np.array([0, 0, 1])
-env_kwargs['flight_dome_size'] =     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
-env_kwargs['seed'] = seed
+start_pos = np.array([ [14, -5, 7], [0, 0, 1] ])
+start_orn = np.zeros_like(start_pos)
+env_kwargs['start_pos'] = start_pos
 env_kwargs['spawn_settings'] = None
-env_kwargs['num_lm'] = spawn_settings['num_lm']
-env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 30
-env_kwargs['lw_stand_still'] = True
+env_kwargs['formation_center'] = np.array([0,0,1])
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
@@ -49,11 +36,11 @@ last_start_pos = env_kwargs['start_pos']
 while env.agents:
 
 
-    actions = {agent: env.action_space(agent).sample() for agent in env.agents}
-    #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+    #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
-
-    actions['agent_0'] = np.array([20, 0, 0, 0.123*i]) # np.array([i, i, 0, 0.123*i])
+    #always chase
+    #actions['agent_0'] = env.desired_vel #  np.array([-4, -4, 0, 0.15]) # np.array([i, i, 0, 0.123*i])
     #actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     #actions['agent_2'] = np.array([5, 2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])
@@ -79,7 +66,8 @@ while env.agents:
         print(f'{terminations=} {truncations=}\n')
         print(f'{infos=}\n\n\n')
         time.sleep(0)
-        env.write_step_data('reward_data.csv')
+        env.write_step_data(Path('modules/examples/step_data.csv'))
+        env.write_obs_data(Path('modules/examples/obs_data.csv'))
         #env.plot_rewards_data('reward_data.csv')
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
