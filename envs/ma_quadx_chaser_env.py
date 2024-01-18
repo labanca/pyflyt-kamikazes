@@ -84,6 +84,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         max_velocity_magnitude: float = 10,
         save_step_data: bool = False,
         reward_type: int = 0,
+        explosion_radius: float = 0.5,
+        thrust_limit: float = 10.0,
     ):
         """__init__.
 
@@ -125,6 +127,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             lethal_angle=lethal_angle,
             lethal_distance=lethal_distance,
             reward_type=reward_type,
+            explosion_radius=explosion_radius,
+            thrust_limit=thrust_limit,
 
         )
 
@@ -393,8 +397,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_id = self.find_nearest_lw(agent_id)
         self.current_target_id[agent_id] = target_id # stores targets
 
-
-
         if self.reward_type == 0:
 
 
@@ -418,26 +420,49 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                  * 100.0
                  )
 
-
+        # waypoint_rew - separation vector
         elif self.reward_type == 1:
 
-            separation = self.drone_positions[target_id] - self.drone_positions[agent_id]
-            norm = np.linalg.norm(separation)
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
 
-            direction = separation/(norm if norm > 0 else 1)
+                separation = self.drone_positions[target_id] - self.drone_positions[agent_id]
+                norm = np.linalg.norm(separation)
 
-            intensity = self.max_velocity_magnitude
+                direction = separation/(norm if norm > 0 else 1)
+                intensity = 5
+                vx, vy, vz = direction * intensity
 
-            vx, vy, vz = direction * intensity
-            self.desired_vel = np.array([vx, vy, 0, vz])
-            self.rew_speed_magnitude[agent_id] = -np.linalg.norm(self.desired_vel - self.current_actions[agent_id])
+                self.desired_vel = np.array([vx, vy, 0, vz])
+                self.rew_speed_magnitude[agent_id] = -np.linalg.norm(self.desired_vel - self.past_actions[agent_id])
 
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                distance = self.current_distance[agent_id][target_id]
+                self.rew_close_to_target[agent_id] = 1 / (distance if distance > 0 else 0.09)
+
+
+        elif self.reward_type == 2:
+
+
+            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                d = self.current_distance[agent_id][target_id]
+                r = self.thrust_limit
+                collision_distance = max(d - r, 0.1)
+                self.rew_close_to_target[agent_id] = 1 / collision_distance
 
 
         self.rew_closing_distance[agent_id] *= self.distance_factor
         self.rew_close_to_target[agent_id] *= self.proximity_factor
         self.rew_speed_magnitude[agent_id] *= self.speed_factor
-
 
         self.rewards[agent_id] += (
                 self.rew_closing_distance[agent_id]

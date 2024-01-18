@@ -53,6 +53,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         max_velocity_magnitude: float = 10,
         save_step_data: bool = False,
         reward_type: int = 0,
+        explosion_radius: float = 0.5,
+        thrust_limit: float = 10.0,
     ):
         """__init__.
 
@@ -90,7 +92,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             )
 
         # action space flight_mode 6: vx, vy, vr, vz
-        self.thrust_limit = 20
+        self.thrust_limit = thrust_limit
 
 
         high = np.array(
@@ -170,6 +172,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.max_velocity_magnitude = max_velocity_magnitude
         self.save_step_data = save_step_data,
         self.reward_type = reward_type
+        self.explosion_radius = explosion_radius
 
         """ PETTINGZOO """
         self.num_drones = len(start_pos)
@@ -320,6 +323,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.squad_id_mapping = {}
         self.observation_dict = {}
+        self.rewards_data = []
 
         self.desired_vel = np.array([0,0,0,0])
 
@@ -332,6 +336,12 @@ class MAQuadXBaseEnv(ParallelEnv):
             drone_options=drone_options,
             seed=seed,
         )
+
+        [
+            self.aviary.changeDynamics(self.aviary.drones[k].Id,-1, mass=0.0, localInertiaDiagonal=0.0,)
+            for k,v in self.drone_classes.items()
+            if v == 'lw'
+        ]
 
         self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2) for id in range(3)]
 

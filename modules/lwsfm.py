@@ -303,9 +303,9 @@ class LWFSM:
 
                 # Calculate hit probability based on velocity
                 #target_drone_velocity = self.manager.env.attitudes[self.current_threat_id][2, :]
-                velocity_magnitude = self.manager.env.current_magnitude[self.current_threat_id]
+                hit_chance = self.manager.env.hit_probability[self.id][self.current_threat_id]
                 max_hit_probability = 0.9
-                hit_probability = max(max_hit_probability - velocity_magnitude / self.manager.env.max_velocity_magnitude, 0.01)
+                hit_probability = max(hit_chance, 0.01)
 
                 # Determine if the shot hits
                 shot_outcome = np.random.random()

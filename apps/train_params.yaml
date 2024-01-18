@@ -33,7 +33,7 @@ env_kwargs:
   num_lm: *num_lm
   num_lw: *num_lw
   agent_hz: 30
-  max_duration_seconds: 15
+  max_duration_seconds: 10
   lw_stand_still: true
   lw_moves_random: false
   lw_chases: false
@@ -43,11 +43,13 @@ env_kwargs:
   lethal_angle: 0.15
   lethal_distance: 3.0
   max_velocity_magnitude: 10.0
-  reward_type: 1
-  rew_exploding_target: 200.0
-  distance_factor: 30.0
-  proximity_factor: 0.2
-  speed_factor: 1.0
+  explosion_radius: 0.5
+  thrust_limit: 10.0
+  reward_type: 2
+  rew_exploding_target: 100.0
+  distance_factor: 3.0
+  proximity_factor: 0.1
+  speed_factor: 0.0
   save_step_data: false
 
 train_kwargs:

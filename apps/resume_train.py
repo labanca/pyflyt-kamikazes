@@ -134,86 +134,33 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ -1* speed_factor as constant penalty. ally obs fixed, obs target_distance consider explosion radius """
+    train_desc = """ take ma_quadx_chaser_20240116-142312 and train with the speed vector reward with diffent speed_factor values, trying to gain overall speed"""
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240115-142614'
-    model_name = 'ma_quadx_chaser-1024000.zip'
+    model_dir = 'ma_quadx_chaser_20240117-174627'
+    model_name = 'ma_quadx_chaser-6063232.zip'
 
-    steps = 2048 * 500
+    steps = 10_000_000
 
     num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):
 
+
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,
             model_name=model_name, model_dir=model_dir,
             env_kwargs=env_kwargs, train_kwargs=train_kwargs)
 
+        env_kwargs['reward_type'] = 2
+        env_kwargs['thrust_limit'] = 10
+        env_kwargs['explosion_radius'] = 0.5
+
         save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
-
-
-
-        # env_kwargs['distance_factor'] +=1
-        #
-        # if i in [9, 19, 29]:
-        #     env_kwargs['speed_factor'] += 0.1
-        #     if reset_model:
-        #         model_name = 'a'
-
-
-        # if i == 2:
-        #     env_kwargs['proximity_factor'] = 0.5
-        #     if reset_model:
-        #          model_name = 'a'
-        #
-        # if i == 5:
-        #     env_kwargs['proximity_factor'] = 1.0
-        #     if reset_model:
-        #          model_name = 'a'
-
-
-
-        # if i == 25:
-        #     env_kwargs['num_lm'] = 2
-        #     spawn_settings['num_lm'] = 2
-        #     env_kwargs['spawn_settings'] = spawn_settings
-        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
-        #         **spawn_settings)
-        #
-        #     if reset_model:
-        #         model_name = 'a'
-
-        # if i == 9:
-        #     env_kwargs['num_lm'] = 9
-        #     spawn_settings['num_lm'] = 9
-        #     env_kwargs['num_lw'] = 3
-        #     spawn_settings['num_lw'] = 3
-        #     env_kwargs['spawn_settings'] = spawn_settings
-        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
-        #         **spawn_settings)
-        # #
-        #     if reset_model:
-        #         model_name = 'a'
-        #
-        # if i == 14:
-        #     env_kwargs['num_lm'] = 15
-        #     spawn_settings['num_lm'] = 15
-        #     env_kwargs['num_lw'] = 5
-        #     spawn_settings['num_lw'] = 5
-        #     env_kwargs['spawn_settings'] = spawn_settings
-        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(
-        #         **spawn_settings)
-        #
-        #     if reset_model:
-        #         model_name = 'a'
-
-
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/
