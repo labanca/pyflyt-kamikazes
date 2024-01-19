@@ -94,21 +94,22 @@ class MAQuadXBaseEnv(ParallelEnv):
         # action space flight_mode 6: vx, vy, vr, vz
         self.thrust_limit = thrust_limit
 
+        self.action_bounds = 1
 
         high = np.array(
             [
-                self.thrust_limit,
-                self.thrust_limit,
-                self.thrust_limit,
-                self.thrust_limit,
+                self.action_bounds,
+                self.action_bounds,
+                self.action_bounds,
+                self.action_bounds,
             ]
         )
         low = np.array(
             [
-                -self.thrust_limit,
-                -self.thrust_limit,
-                -self.thrust_limit,
-                -self.thrust_limit,
+                -self.action_bounds,
+                -self.action_bounds,
+                -self.action_bounds,
+                -self.action_bounds,
             ]
         )
         self._action_space = spaces.Box(low=low, high=high, dtype=np.float64)
@@ -275,6 +276,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_acc_rew = {k: 0.0 for k in self.agents}
         self.current_inf = {k: dict() for k in self.agents}
         self.current_obs = {k: [] for k in self.agents}
+
         self.rew_closing_distance = np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rew_close_to_target =  np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rew_engaging_enemy =  np.zeros((self.num_possible_agents), dtype=np.float64)
@@ -295,6 +297,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.in_cone = np.zeros((self.num_drones, self.num_drones), dtype=bool)
         self.in_range = np.zeros((self.num_drones, self.num_drones), dtype=bool)
         self.chasing = np.zeros((self.num_drones, self.num_drones), dtype=bool)
+        self.approaching = np.zeros((self.num_drones, self.num_drones), dtype=bool)
+        self.hit_probability = np.zeros((self.num_drones, self.num_drones), dtype=bool)
 
         self.previous_magnitude = np.zeros(self.num_drones, dtype=np.float64)
         self.current_magnitude = np.zeros(self.num_drones, dtype=np.float64)
@@ -315,8 +319,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_traj_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.previous_traj_angles = np.zeros((self.num_drones,self.num_drones), dtype=np.float64)
 
-        self.current_vel_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.previous_vel_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
+        self.current_vel_angles = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
+
+        self.ground_velocities = np.zeros((self.num_drones, 3), dtype=np.float64)
 
         self.last_obs_time = -1.0
         self.last_rew_time = -1.0
@@ -343,10 +349,10 @@ class MAQuadXBaseEnv(ParallelEnv):
             if v == 'lw'
         ]
 
-        self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2) for id in range(3)]
-
-        self.change_visuals()
-        #self.init_debug_vectors()
+        if self.render_mode is not None:
+            self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2) for id in range(3)]
+            self.change_visuals()
+            #self.init_debug_vectors()
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -368,8 +374,18 @@ class MAQuadXBaseEnv(ParallelEnv):
                                  shoot_range=self.lw_shoot_range,
                                  )
 
-        self.aviary.resetDebugVisualizerCamera(cameraDistance=2, cameraYaw=90, cameraPitch=0,
+        if self.render_mode is not None:
+            self.aviary.resetDebugVisualizerCamera(cameraDistance=2, cameraYaw=90, cameraPitch=0,
                                             cameraTargetPosition=self.formation_center)
+
+        # max reward value
+        self.max_reward = (
+                self.max_steps * (1/0.09)
+                * self.proximity_factor
+                + 2 * self.flight_dome_size * self.distance_factor
+                + self.env_step_ratio * 100
+        )
+        self.action_scaling = np.array([self.thrust_limit, self.thrust_limit, np.pi, self.thrust_limit])
 
         # wait for env to stabilize
         for _ in range(10):
@@ -516,13 +532,14 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_actions *= 0.0
 
 
+
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
-                self.current_actions[id] =  actions[uav] #rescale actions
+                self.current_actions[id] = actions[uav] #rescale actions
                 #print(f'{actions[uav]=}')
                 #print(f'{self.current_magnitude[self.agent_name_mapping[uav]]=}')
                 #print(f'{self.ground_velocities[self.agent_name_mapping[uav]]=}')
-                self.aviary.set_setpoint(id, self.current_actions[id])
+                self.aviary.set_setpoint(id, self.current_actions[id] * self.action_scaling) # denormalize actions
 
         # observation and rewards dictionary
         observations = dict()
@@ -952,5 +969,12 @@ class MAQuadXBaseEnv(ParallelEnv):
         else:
             return False
 
+    def normalize_linear(self, array):
+        linear_min = -self.flight_dome_size
+        linear_max = self.flight_dome_size
+        return (array - linear_min) / (linear_max - linear_min)
 
-
+    def normalize_angular(self, array):
+        linear_min = -np.pi
+        linear_max = np.pi
+        return (array - linear_min) / (linear_max - linear_min)

@@ -17,9 +17,10 @@ model = PPO.load(model_path)
 params_path = f'apps/train_params.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([ [-5, -7, 7], [0, 0, 1] ])
+start_pos = np.array([ [-1, -1, 1], [0, 0, 1] ])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
+env_kwargs['start_orn'] = start_orn
 env_kwargs['num_lm'] = 1
 env_kwargs['spawn_settings'] = None
 env_kwargs['formation_center'] = np.array([0,0,1])
@@ -37,11 +38,11 @@ last_start_pos = env_kwargs['start_pos']
 while env.agents:
 
 
-    #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
-    actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+    actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     #always chase
-    actions['agent_0'] = env.desired_vel #  np.array([-4, -4, 0, 0.15]) # np.array([i, i, 0, 0.123*i])
+    #actions['agent_0'] = np.array([-0, 0, 3.14 , 5]) # np.array([i, i, 0, 0.123*i]) #env.desired_vel
     #actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     #actions['agent_2'] = np.array([5, 2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])

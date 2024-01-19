@@ -34,8 +34,6 @@ def save_dict_to_csv(data, csv_file):
             writer.writerow(data)
 
 
-
-
 def read_yaml_file(file_path):
     with open(file_path, 'r') as file:
         data = yaml.safe_load(file)

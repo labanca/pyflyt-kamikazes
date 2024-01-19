@@ -139,7 +139,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 22,),
+            shape=(self.combined_space.shape[0] + 25,),
             dtype=np.float64,
         )
 
@@ -296,48 +296,49 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         else:
             hit_probability = 0.0
 
-        self.observation_dict = dict(
-            step_count=self.step_count,
-            agent_id=agent_id,
-            ang_vel=ang_vel,
-            ang_pos=ang_pos,
-            lin_vel=lin_vel,
-            lin_pos=lin_pos,
-            agent_aux_state=agent_aux_state,
-            past_actions=self.past_actions[agent_id],
-            ally_ang_vel=ally_ang_vel,
-            ally_delta_ang_pos=ally_delta_ang_pos,
-            ally_delta_lin_vel=ally_delta_lin_vel,
-            ally_delta_lin_pos=ally_delta_lin_pos,
-            target_ang_vel=target_ang_vel,
-            target_delta_ang_pos=target_delta_ang_pos,
-            target_delta_lin_vel=target_delta_lin_vel,
-            target_delta_lin_pos=target_delta_lin_pos,
-            target_distance=target_distance,
-            hit_probability=hit_probability,
-        )
+        if self.save_step_data:
+            self.observation_dict = dict(
+                step_count=self.step_count,
+                agent_id=agent_id,
+                ang_vel=ang_vel,
+                ang_pos=ang_pos,
+                lin_vel=lin_vel,
+                lin_pos=lin_pos,
+                agent_aux_state=agent_aux_state,
+                past_actions=self.past_actions[agent_id],
+                ally_ang_vel=ally_ang_vel,
+                ally_delta_ang_pos=ally_delta_ang_pos,
+                ally_delta_lin_vel=ally_delta_lin_vel,
+                ally_delta_lin_pos=ally_delta_lin_pos,
+                target_ang_vel=target_ang_vel,
+                target_delta_ang_pos=target_delta_ang_pos,
+                target_delta_lin_vel=target_delta_lin_vel,
+                target_delta_lin_pos=target_delta_lin_pos,
+                target_distance=target_distance,
+                hit_probability=hit_probability,
+            )
 
         # depending on angle representation, return the relevant thing
         if self.angle_representation == 0:
             return np.array(
                 [
-                    *ang_vel,
-                    *ang_pos,
-                    *lin_vel,
-                    *lin_pos,
+                    *(ang_vel/np.pi),
+                    *(ang_pos/self.thrust_limit),
+                    *(lin_vel/self.thrust_limit),
+                    *(lin_pos/self.flight_dome_size),
                     *agent_aux_state,
-                    *self.past_actions[agent_id],
+                    *(self.past_actions[agent_id]/self.action_scaling),
 
-                    *ally_ang_vel,
-                    *ally_delta_ang_pos
-                    *ally_delta_lin_vel,
-                    *ally_delta_lin_pos,
+                    *(ally_ang_vel/self.thrust_limit),
+                    *(ally_delta_ang_pos/self.thrust_limit),
+                    *(ally_delta_lin_vel/self.thrust_limit),
+                    *(ally_delta_lin_pos/self.flight_dome_size),
 
-                    *target_ang_vel,
-                    *target_delta_ang_pos,
-                    *target_delta_lin_vel,
-                    *target_delta_lin_pos,
-                    target_distance,
+                    *(target_ang_vel/self.thrust_limit),
+                    *(target_delta_ang_pos/self.thrust_limit),
+                    *(target_delta_lin_vel/self.thrust_limit),
+                    *(target_delta_lin_pos/self.flight_dome_size),
+                    target_distance/self.flight_dome_size,
                     hit_probability,
                 ]
             )
@@ -345,23 +346,23 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             return np.array(
                 [
-                    *ang_vel,
-                    *ang_pos,
-                    *lin_vel,
-                    *lin_pos,
+                    *self.normalize_angular(ang_vel) ,
+                    *self.normalize_angular(ang_pos),
+                    *self.normalize_linear(lin_vel) ,
+                    *self.normalize_linear(lin_pos) ,
                     *agent_aux_state,
-                    *self.past_actions[agent_id],
+                    *self.past_actions[agent_id] ,
 
-                    *ally_ang_vel,
-                    *ally_delta_ang_pos
-                    *ally_delta_lin_vel,
-                    *ally_delta_lin_pos,
+                    *self.normalize_angular(ally_ang_vel) ,
+                    *self.normalize_angular(ally_delta_ang_pos) ,
+                    *self.normalize_linear(ally_delta_lin_vel) ,
+                    *self.normalize_linear(ally_delta_lin_pos) ,
 
-                    *target_ang_vel,
-                    *target_delta_ang_pos,
-                    *target_delta_lin_vel,
-                    *target_delta_lin_pos,
-                    target_distance,
+                    *self.normalize_angular(target_ang_vel) ,
+                    *self.normalize_angular(target_delta_ang_pos) ,
+                    *self.normalize_linear(target_delta_lin_vel) ,
+                    *self.normalize_linear(target_delta_lin_pos) ,
+                    self.normalize_linear(target_distance) ,
                     hit_probability,
                 ]
             )
@@ -387,6 +388,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         if term:
             self.disarm_drone(agent_id)
+
+        # rescale reward
+        reward = reward/self.max_reward
 
         return term, trunc, reward, info
 
@@ -455,7 +459,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     a_max=None, )
 
                 d = self.current_distance[agent_id][target_id]
-                r = self.thrust_limit
+                r = self.explosion_radius
                 collision_distance = max(d - r, 0.1)
                 self.rew_close_to_target[agent_id] = 1 / collision_distance
 
@@ -508,14 +512,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
-
-    def print_rewards(self, agent_id, **kargs):
-        for k,v in kargs.items():
-            print(f'{agent_id} {k} = {v}')
-
-        print(f'{self.current_magnitude[agent_id]=}')
-        print(f'{self.current_vel_angles[agent_id][1]=}')
-        print(f'------------------------------------------------------------')
 
     def write_step_data(self, filename):
         # write the rewards data to a file

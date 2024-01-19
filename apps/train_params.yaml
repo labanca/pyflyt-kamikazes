@@ -27,7 +27,7 @@ env_kwargs:
     - 0
     - 0
     - 1
-  flight_dome_size: 30.0
+  flight_dome_size: 17.0
   seed: null
   spawn_settings: *spawn_settings
   num_lm: *num_lm
@@ -43,8 +43,8 @@ env_kwargs:
   lethal_angle: 0.15
   lethal_distance: 3.0
   max_velocity_magnitude: 10.0
-  explosion_radius: 0.5
   thrust_limit: 10.0
+  explosion_radius: 0.5
   reward_type: 2
   rew_exploding_target: 100.0
   distance_factor: 3.0
@@ -54,11 +54,11 @@ env_kwargs:
 
 train_kwargs:
   device: cuda
-  batch_size: 512
-  lr: 0.001
-  discount_factor: 0.98
+  batch_size: 128
+  lr: 0.0001
+  discount_factor: 0.99
   nn_t:
-    - 128
-    - 128
-    - 128
-  num_vec_envs: 16
+    - 256
+    - 256
+    - 512
+  num_vec_envs: 8
