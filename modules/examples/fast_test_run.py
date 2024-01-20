@@ -5,29 +5,28 @@ from stable_baselines3 import PPO
 import numpy as np
 import time
 
-
-
-
-
 #model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
+from modules.utils import generate_start_pos_orn
+
 seed=None
 
 #print((os.cpu_count() or 1))
 spawn_settings = dict(
-    lw_center_bounds=5.0,
-    lm_center_bounds=10.0,
-    lw_spawn_radius=1.0,
-    lm_spawn_radius=10,
-    min_z=1.0,
+    lw_center_bounds=2.0,
+    lm_center_bounds=2.0,
+    lw_spawn_radius=0.5,
+    lm_spawn_radius=2,
+    min_z=1,
     seed=None,
-    num_lw=2,
-    num_lm=3,
+    num_lw=5,
+    num_lm=5,
 )
 
-flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'],
-start_pos = np.array([ [4, 4, 1], [7,7, 1], [12, 7, 1], [0, 0, 1], [10, 10, 1]])
+flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']
+start_pos, _, _ = generate_start_pos_orn(**spawn_settings)
+
 start_orn = np.zeros_like(start_pos)
-formation_center = np.array([0, 0, 1])
+formation_center = np.array([0, 0, 2])
 
 env_kwargs = dict(
     start_pos=start_pos,

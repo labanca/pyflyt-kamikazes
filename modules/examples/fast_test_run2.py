@@ -17,24 +17,28 @@ model = PPO.load(model_path)
 params_path = f'apps/train_params.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([ [-1, -1, 1], [0, 0, 1] ])
+start_pos = np.array([ [-4, -4, 1], [0,-0.6,1], [-7,-7,7], [0,0,1], [0, 0, 1], [7,7,7] ])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
 env_kwargs['start_orn'] = start_orn
-env_kwargs['num_lm'] = 1
+env_kwargs['num_lm'] = 3
+env_kwargs['num_lw'] = 3
+env_kwargs['max_duration_seconds'] = 60
 env_kwargs['spawn_settings'] = None
 env_kwargs['formation_center'] = np.array([0,0,1])
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)
 
-last_term = {}
+
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
             'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
-first_time = True
+
 num_games = 1
 i = 1
 last_start_pos = env_kwargs['start_pos']
+
+env.aviary.set_mode([6,7,7,7,7,7])
 while env.agents:
 
 
@@ -42,25 +46,13 @@ while env.agents:
     #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     #always chase
-    #actions['agent_0'] = np.array([-0, 0, 3.14 , 5]) # np.array([i, i, 0, 0.123*i]) #env.desired_vel
-    #actions['agent_1'] = np.array([-1, 0, 0, 0.8])
-    #actions['agent_2'] = np.array([5, 2, 0, 0.8])
+    actions['agent_0'] = np.array([4, 4, 0, 0.9]) # np.array([i, i, 0, 0.123*i]) #env.desired_vel
+    actions['agent_1'] = np.array([[-0.2,-0.6, 0,1]])
+    actions['agent_2'] = np.array([0, 0, 0, 0])
     #actions['agent_3'] = np.array([0, 0, 0, 0])
     i +=1
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
-
-
-    if first_time == True:
-        first_time = False
-
-
-    if any(terminations.values()) or any(truncations.values()):
-
-        for agent_key, agent_data in infos.items():
-            for key, value in agent_data.items():
-                if key in counters:
-                    counters[key] += 1
 
     if all(terminations.values()) or all(truncations.values()):
         print(f'********* EPISODE END **********\n')
@@ -73,15 +65,19 @@ while env.agents:
         #env.plot_rewards_data('reward_data.csv')
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
-        observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')
+        if num_games == 0:
+            print(env.info_counters)
+            print(env.current_acc_rew)
+            break
+
+        observations, infos = env.reset(seed=seed)
 
 
-    if num_games == 0:
-        print(counters)
-        print(f'{i=}')
-        break
+
+
+
 
 env.close()
 

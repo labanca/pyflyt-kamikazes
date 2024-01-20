@@ -133,7 +133,7 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ take ma_quadx_chaser_20240116-142312 and train with the speed vector reward with diffent speed_factor values, trying to gain overall speed"""
+    train_desc = """ """
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
@@ -142,8 +142,8 @@ if __name__ == "__main__":
     model_dir = 'ma_quadx_chaser_20240117-174627'
     model_name = 'a'
 
-    steps = 2_000_000
-    num_resumes = 1
+    steps = 7_000_000
+    num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):

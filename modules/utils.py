@@ -106,7 +106,7 @@ def generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_
 
         # Check if the generated coordinates are outside the exclusion area of the lw formation
         lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-        if lm_distance > lw_spawn_radius:
+        if lm_distance > lw_center_bounds:
             lm_coordinates.append([x, y, z])
 
     return np.array(lm_coordinates)

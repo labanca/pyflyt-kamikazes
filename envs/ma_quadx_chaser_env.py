@@ -322,47 +322,48 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         if self.angle_representation == 0:
             return np.array(
                 [
-                    *(ang_vel/np.pi),
-                    *(ang_pos/self.thrust_limit),
-                    *(lin_vel/self.thrust_limit),
-                    *(lin_pos/self.flight_dome_size),
+                    *self.normalize_angular(ang_vel),
+                    *self.normalize_angular(ang_pos),
+                    *self.normalize_linear(lin_vel),
+                    *self.normalize_linear(lin_pos),
                     *agent_aux_state,
-                    *(self.past_actions[agent_id]/self.action_scaling),
+                    *self.past_actions[agent_id],
 
-                    *(ally_ang_vel/self.thrust_limit),
-                    *(ally_delta_ang_pos/self.thrust_limit),
-                    *(ally_delta_lin_vel/self.thrust_limit),
-                    *(ally_delta_lin_pos/self.flight_dome_size),
+                    *self.normalize_angular(ally_ang_vel),
+                    *self.normalize_angular(ally_delta_ang_pos),
+                    *self.normalize_linear(ally_delta_lin_vel),
+                    *self.normalize_linear(ally_delta_lin_pos),
 
-                    *(target_ang_vel/self.thrust_limit),
-                    *(target_delta_ang_pos/self.thrust_limit),
-                    *(target_delta_lin_vel/self.thrust_limit),
-                    *(target_delta_lin_pos/self.flight_dome_size),
-                    target_distance/self.flight_dome_size,
+                    *self.normalize_angular(target_ang_vel),
+                    *self.normalize_angular(target_delta_ang_pos),
+                    *self.normalize_linear(target_delta_lin_vel),
+                    *self.normalize_linear(target_delta_lin_pos),
+                    self.normalize_linear(target_distance),
                     hit_probability,
+
                 ]
             )
         elif self.angle_representation == 1:
 
             return np.array(
                 [
-                    *self.normalize_angular(ang_vel) ,
-                    *self.normalize_angular(ang_pos),
-                    *self.normalize_linear(lin_vel) ,
-                    *self.normalize_linear(lin_pos) ,
+                    *(ang_vel / self.thrust_limit),
+                    *(ang_pos / 2 * np.pi),
+                    *(lin_vel / self.thrust_limit),
+                    *(lin_pos / self.flight_dome_size),
                     *agent_aux_state,
-                    *self.past_actions[agent_id] ,
+                    *(self.past_actions[agent_id]),
 
-                    *self.normalize_angular(ally_ang_vel) ,
-                    *self.normalize_angular(ally_delta_ang_pos) ,
-                    *self.normalize_linear(ally_delta_lin_vel) ,
-                    *self.normalize_linear(ally_delta_lin_pos) ,
+                    *(ally_ang_vel / self.thrust_limit),
+                    *(ally_delta_ang_pos / 2 * np.pi),
+                    *(ally_delta_lin_vel / self.thrust_limit),
+                    *(ally_delta_lin_pos / self.flight_dome_size),
 
-                    *self.normalize_angular(target_ang_vel) ,
-                    *self.normalize_angular(target_delta_ang_pos) ,
-                    *self.normalize_linear(target_delta_lin_vel) ,
-                    *self.normalize_linear(target_delta_lin_pos) ,
-                    self.normalize_linear(target_distance) ,
+                    *(target_ang_vel / self.thrust_limit),
+                    *(target_delta_ang_pos / 2 * np.pi),
+                    *(target_delta_lin_vel / self.thrust_limit),
+                    *(target_delta_lin_pos / self.flight_dome_size),
+                    target_distance / self.flight_dome_size,
                     hit_probability,
                 ]
             )
@@ -384,13 +385,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         reward += self.rewards[agent_id]
 
-        self.compute_collisions(agent_id)
-
-        if term:
-            self.disarm_drone(agent_id)
-
         # rescale reward
-        reward = reward/self.max_reward
+        reward = reward
 
         return term, trunc, reward, info
 

@@ -53,8 +53,8 @@ env_kwargs:
   save_step_data: false
 
 train_kwargs:
-  device: cuda
-  batch_size: 128
+  device: cpu
+  batch_size: 256
   lr: 0.0001
   discount_factor: 0.99
   nn_t:

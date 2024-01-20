@@ -7,7 +7,7 @@ from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 #model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240119-020359/ma_quadx_chaser-8000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240119-172809/ma_quadx_chaser-2000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -46,12 +46,12 @@ while env.agents:
 
     last_term = terminations
 
-    if any(terminations.values()) or any(truncations.values()):
-
-        for agent_key, agent_data in infos.items():
-            for key, value in agent_data.items():
-                if key in counters:
-                    counters[key] += 1
+    # if any(terminations.values()) or any(truncations.values()):
+    #
+    #     for agent_key, agent_data in infos.items():
+    #         for key, value in agent_data.items():
+    #             if key in counters:
+    #                 counters[key] += 1
 
     if all(terminations.values()) or all(truncations.values()):
         print(f'********* EPISODE END **********\n')
@@ -71,7 +71,7 @@ while env.agents:
         print(f'Remaining games: {num_games}')
 
     if num_games == 0:
-        print(counters)
+        print(env.info_counters)
         break
 
 env.close()
