@@ -348,19 +348,19 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             return np.array(
                 [
                     *(ang_vel / self.thrust_limit),
-                    *(ang_pos / 2 * np.pi),
+                    *(ang_pos / np.pi),
                     *(lin_vel / self.thrust_limit),
                     *(lin_pos / self.flight_dome_size),
                     *agent_aux_state,
                     *(self.past_actions[agent_id]),
 
                     *(ally_ang_vel / self.thrust_limit),
-                    *(ally_delta_ang_pos / 2 * np.pi),
+                    *(ally_delta_ang_pos / np.pi),
                     *(ally_delta_lin_vel / self.thrust_limit),
                     *(ally_delta_lin_pos / self.flight_dome_size),
 
                     *(target_ang_vel / self.thrust_limit),
-                    *(target_delta_ang_pos / 2 * np.pi),
+                    *(target_delta_ang_pos / np.pi),
                     *(target_delta_lin_vel / self.thrust_limit),
                     *(target_delta_lin_pos / self.flight_dome_size),
                     target_distance / self.flight_dome_size,
@@ -457,6 +457,21 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 d = self.current_distance[agent_id][target_id]
                 r = self.explosion_radius
                 collision_distance = max(d - r, 0.1)
+                self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+        elif self.reward_type == 3:
+
+
+            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                # do no consider explosion_radius in distance
+                d = self.current_distance[agent_id][target_id]
+                collision_distance = max(d, 0.1)
                 self.rew_close_to_target[agent_id] = 1 / collision_distance
 
 

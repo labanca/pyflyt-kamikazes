@@ -142,11 +142,30 @@ if __name__ == "__main__":
     model_dir = 'ma_quadx_chaser_20240117-174627'
     model_name = 'a'
 
-    steps = 7_000_000
-    num_resumes = 2
+    steps = 2_000_000
+    num_resumes = 4
     reset_model = False
 
     for i in range(num_resumes):
+
+        if i == 1:
+            env_kwargs['reward_type'] = 2
+            env_kwargs['explosion_radius'] = 0.0
+            model_name = 'a'
+
+        if i == 2:
+            env_kwargs['reward_type'] = 3
+            env_kwargs['thrust_limit'] = 10
+            env_kwargs['explosion_radius'] = 0.5
+            model_name = 'a'
+
+        if i == 3:
+            env_kwargs['reward_type'] = 3
+            env_kwargs['thrust_limit'] = 10
+            env_kwargs['explosion_radius'] = 0.1
+            model_name = 'a'
+
+
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,
             model_name=model_name, model_dir=model_dir,
@@ -157,9 +176,6 @@ if __name__ == "__main__":
         save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
-        env_kwargs['reward_type'] = 2
-        env_kwargs['thrust_limit'] = 10
-        env_kwargs['explosion_radius'] = 0.0
-        model_name = 'a'
+
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/

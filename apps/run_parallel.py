@@ -5,9 +5,20 @@ from pathlib import Path
 import numpy as np
 from modules.utils import *
 
+import sys
+def sizeof_fmt(num, suffix='B'):
+    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, 'Yi', suffix)
+
+
+
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 #model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240119-172809/ma_quadx_chaser-2000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240120-014656/ma_quadx_chaser-7000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -27,10 +38,10 @@ last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
             'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
 first_time = True
-num_games = 1
+num_games = 30
 
 while env.agents:
-
+    print(env.aviary.elapsed_time)
     #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
@@ -66,8 +77,9 @@ while env.agents:
         #env.plot_agent_rewards('reward_data.csv', 0)
         #env.plot_agent_infos2('reward_data.csv', 0)
 
-        #observations, infos = env.reset(seed=seed)
+
         num_games -= 1
+
         print(f'Remaining games: {num_games}')
 
     if num_games == 0:

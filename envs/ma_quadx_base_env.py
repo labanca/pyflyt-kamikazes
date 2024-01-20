@@ -588,37 +588,37 @@ class MAQuadXBaseEnv(ParallelEnv):
                     self.append_obs_data(self.observation_dict)
 
 
-            for agent in self.agents:
-                self.compute_collisions(agent)
-                if terminations[agent]:
-                    self.disarm_drone(self.agent_name_mapping[agent])
+        for agent in self.agents:
+            self.compute_collisions(agent)
+            if terminations[agent]:
+                self.disarm_drone(self.agent_name_mapping[agent])
 
-            # increment step count and cull dead agents for the next round
-            self.step_count += 1
-            self.agents = [
-                agent
-                for agent in self.agents
-                if not (terminations[agent] or truncations[agent])
-            ]
-            self.update_control_lists()
+        # increment step count and cull dead agents for the next round
+        self.step_count += 1
+        self.agents = [
+            agent
+            for agent in self.agents
+            if not (terminations[agent] or truncations[agent])
+        ]
+        self.update_control_lists()
 
 
-            # all targets destroyed, End.
-            if self.targets == []:
-                terminations = {k: True if terminations[k] == False else v for k, v in terminations.items()}
+        # all targets destroyed, End.
+        if self.targets == []:
+            terminations = {k: True if terminations[k] == False else v for k, v in terminations.items()}
 
-                infos = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
-                self.current_inf = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
+            infos = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
+            self.current_inf = {key: {'survived': True, **infos[key]} if infos[key] == {} else infos[key] for key in infos.keys() }
 
-                infos = {key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in infos.keys()}
-                self.current_inf = {key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in infos.keys()}
+            infos = {key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in infos.keys()}
+            self.current_inf = {key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in infos.keys()}
 
-                self.sumarize_infos()
-                return observations, rewards, terminations, truncations, infos
+            self.sumarize_infos()
+            return observations, rewards, terminations, truncations, infos
 
-            elif self.agents == []:
-                self.sumarize_infos()
-                return observations, rewards, terminations, truncations, infos
+        elif self.agents == []:
+            self.sumarize_infos()
+            return observations, rewards, terminations, truncations, infos
 
         return observations, rewards, terminations, truncations, infos
 
