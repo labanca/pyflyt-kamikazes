@@ -41,7 +41,7 @@ while env.agents:
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     #always chase
-    actions['agent_0'] = env.desired_vel #  np.array([-4, -4, 0, 0.15]) # np.array([i, i, 0, 0.123*i])
+    #actions['agent_0'] = env.desired_vel #  np.array([-4, -4, 0, 0.15]) # np.array([i, i, 0, 0.123*i])
     #actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     #actions['agent_2'] = np.array([5, 2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])

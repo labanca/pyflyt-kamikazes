@@ -45,18 +45,18 @@ env_kwargs:
   max_velocity_magnitude: 10.0
   thrust_limit: 10.0
   explosion_radius: 0.5
-  reward_type: 2
+  reward_type: 4
   rew_exploding_target: 100.0
-  distance_factor: 3.0
+  distance_factor: 10.0
   proximity_factor: 0.1
-  speed_factor: 0.0
+  speed_factor: 0.1
   save_step_data: false
 
 train_kwargs:
   device: cpu
-  batch_size: 256
-  lr: 0.0001
-  discount_factor: 0.99
+  batch_size: 512
+  lr: 0.001
+  discount_factor: 0.995
   nn_t:
     - 256
     - 256

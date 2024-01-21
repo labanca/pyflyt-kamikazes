@@ -1,4 +1,6 @@
 import os
+import sys
+
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
@@ -62,4 +64,8 @@ class TensorboardCallback(BaseCallback):
             self.logger.record("rew_vec_envs", sum(self.mean_rew_vec_envs)/self.training_env.num_envs)
             #self.logger.dump(self.num_timesteps)
             self.mean_rew_vec_envs = 0
+
+        #try this later _locals['self'].num_timesteps https://github.com/hill-a/stable-baselines/issues/62#issuecomment-565665707
+
         return True
+

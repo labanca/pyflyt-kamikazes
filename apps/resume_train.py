@@ -7,6 +7,7 @@ Author: Elliot (https://github.com/elliottower)
 from __future__ import annotations
 
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +73,7 @@ def train_butterfly_supersuit(
         callback = TensorboardCallback(verbose=1)
 
         model.learn(total_timesteps=steps, callback=callback, progress_bar=False)
+
         model.save(filename)
 
         print(f"Model {model_name} has been saved.")
@@ -129,11 +131,19 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
         EzPickle.__init__(self, *args, **kwargs)
         MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
+def sizeof_fmt(num, suffix='B'):
+    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, 'Yi', suffix)
+
 
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ """
+    train_desc = """  """
 
     params_path = 'apps/train_params.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
@@ -142,29 +152,20 @@ if __name__ == "__main__":
     model_dir = 'ma_quadx_chaser_20240117-174627'
     model_name = 'a'
 
-    steps = 2_000_000
-    num_resumes = 4
+    steps = 4_000_000
+    num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):
 
         if i == 1:
-            env_kwargs['reward_type'] = 2
-            env_kwargs['explosion_radius'] = 0.0
+            train_kwargs['lr'] = 0.001
             model_name = 'a'
 
         if i == 2:
-            env_kwargs['reward_type'] = 3
-            env_kwargs['thrust_limit'] = 10
-            env_kwargs['explosion_radius'] = 0.5
+            train_kwargs['lr'] = 0.001
+            train_kwargs['discount_factor'] = 0.98
             model_name = 'a'
-
-        if i == 3:
-            env_kwargs['reward_type'] = 3
-            env_kwargs['thrust_limit'] = 10
-            env_kwargs['explosion_radius'] = 0.1
-            model_name = 'a'
-
 
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,

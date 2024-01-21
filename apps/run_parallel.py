@@ -5,31 +5,15 @@ from pathlib import Path
 import numpy as np
 from modules.utils import *
 
-import sys
-def sizeof_fmt(num, suffix='B'):
-    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f %s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
-
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 #model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240120-014656/ma_quadx_chaser-7000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240121-055815/ma_quadx_chaser-7000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
 
 params_path = f'{model_folder}/{model_name}.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
-
-# spawn_settings['num_lm'] = 3
-# env_kwargs['num_lm'] = 3
-# env_kwargs['spawn_settings'] = spawn_settings
-# env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = generate_start_pos_orn(**spawn_settings)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=spawn_settings['seed'])

@@ -69,9 +69,9 @@ while env.agents:
     #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
 
-    actions['agent_0'] = np.array([-3, -3, 0, 0]) # np.array([i, i, 0, 0.123*i])
-    actions['agent_1'] = np.array([4, 4, 0, 0.8])
-    actions['agent_2'] = np.array([-5, -2, 0, 0.8])
+    #actions['agent_0'] = np.array([-3, -3, 0, 0]) # np.array([i, i, 0, 0.123*i])
+    #actions['agent_1'] = np.array([4, 4, 0, 0.8])
+    #actions['agent_2'] = np.array([-5, -2, 0, 0.8])
     #actions['agent_3'] = np.array([0, 0, 0, 0])
     i +=1
 

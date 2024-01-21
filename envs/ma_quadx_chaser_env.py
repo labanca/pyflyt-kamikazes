@@ -1,6 +1,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 
 from gymnasium import spaces
@@ -139,7 +141,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 25,),
+            shape=(self.combined_space.shape[0] + 14,),
             dtype=np.float64,
         )
 
@@ -230,6 +232,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.approaching = self.current_distance < self.previous_distance
         self.hit_probability = np.maximum(0.9 - self.current_rel_vel_magnitude/self.max_velocity_magnitude, 0.01)
 
+
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
 
@@ -287,6 +290,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
             ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
 
+        # direction and separation relative to the ground frame
+        # error division agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
+        #separation_direction = (target_lin_pos - lin_pos)/(np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
 
         if len(self.targets):
             if self.lw_manager.squad[target_id - self.num_lm].gun_loaded:
@@ -347,24 +353,23 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             return np.array(
                 [
-                    *(ang_vel / self.thrust_limit),
-                    *(ang_pos / np.pi),
-                    *(lin_vel / self.thrust_limit),
-                    *(lin_pos / self.flight_dome_size),
+                    *ang_vel,
+                    *ang_pos,
+                    *lin_vel,
+                    *lin_pos,
                     *agent_aux_state,
-                    *(self.past_actions[agent_id]),
+                    *self.past_actions[agent_id],
+                    #agent_direction,
 
-                    *(ally_ang_vel / self.thrust_limit),
-                    *(ally_delta_ang_pos / np.pi),
-                    *(ally_delta_lin_vel / self.thrust_limit),
-                    *(ally_delta_lin_pos / self.flight_dome_size),
-
-                    *(target_ang_vel / self.thrust_limit),
-                    *(target_delta_ang_pos / np.pi),
-                    *(target_delta_lin_vel / self.thrust_limit),
-                    *(target_delta_lin_pos / self.flight_dome_size),
-                    target_distance / self.flight_dome_size,
+                    *(target_delta_lin_vel),
+                    *(target_delta_lin_pos),
+                    #separation_direction,
+                    target_distance,
                     hit_probability,
+
+                    0 if near_ally_id == -1 else 1,
+                    *(ally_delta_lin_vel),
+                    *(ally_delta_lin_pos),
                 ]
             )
         else:
@@ -469,10 +474,31 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     a_min=0,
                     a_max=None, )
 
-                # do no consider explosion_radius in distance
+                # does no consider explosion_radius in distance
                 d = self.current_distance[agent_id][target_id]
-                collision_distance = max(d, 0.1)
+                collision_distance = max(d, 0.05)
                 self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+        elif self.reward_type == 4:
+
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                # does no consider explosion_radius in distance
+                d = self.current_distance[agent_id][target_id]
+                collision_distance = max(d, 0.05)
+                self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+            #target_lin_pos = self.drone_positions[target_id]
+            #lin_pos = self.drone_positions[agent_id]
+            #separation_direction = (target_lin_pos - lin_pos) / (np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
+            #agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
+
+            self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
 
         self.rew_closing_distance[agent_id] *= self.distance_factor

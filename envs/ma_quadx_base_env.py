@@ -620,6 +620,10 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.sumarize_infos()
             return observations, rewards, terminations, truncations, infos
 
+
+
+
+
         return observations, rewards, terminations, truncations, infos
 
     #------------------------------ Env End ----------------------------------------------------
@@ -1027,3 +1031,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         linear_min = -np.pi
         linear_max = np.pi
         return (array - linear_min) / (linear_max - linear_min)
+
+    def sizeof_fmt(self, num, suffix='B'):
+        ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+        for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+            if abs(num) < 1024.0:
+                return "%3.1f %s%s" % (num, unit, suffix)
+            num /= 1024.0
+        return "%.1f %s%s" % (num, 'Yi', suffix)
