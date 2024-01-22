@@ -173,6 +173,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.max_velocity_magnitude = max_velocity_magnitude
         self.save_step_data = save_step_data,
         self.reward_type = reward_type
+        self.observation_type = 0
         self.explosion_radius = explosion_radius
 
         """ PETTINGZOO """
@@ -561,7 +562,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
-                #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
+                self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
                 #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
 
                 # compute term trunc reward
@@ -761,12 +762,12 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.num_drones = len(self.agents) + len(self.targets)
 
-    def draw_vel_vector(self, agent_id, line_id = None, length=1.0, lineColorRGB=[1, 1, 0] ):
+    def draw_vel_vector(self, agent_id, line_id = None, length=0.3, lineColorRGB=[1, 1, 0] ):
         # Calculate the forward vector based on the drone's orientation
 
         debug_line = self.aviary.addUserDebugLine(self.aviary.state(agent_id)[-1],
                                                                self.aviary.state(agent_id)[-1] + self.ground_velocities[agent_id],
-                                                               lineWidth=2, replaceItemUniqueId=line_id,
+                                                               lineWidth=3, replaceItemUniqueId=line_id,
                                                                lineColorRGB=[1, 1, 1])
         return debug_line
 

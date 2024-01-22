@@ -7,7 +7,7 @@ from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 #model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240121-055815/ma_quadx_chaser-7000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240121-213703/ma_quadx_chaser-4000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -22,7 +22,7 @@ last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
             'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
 first_time = True
-num_games = 30
+num_games = 1
 
 while env.agents:
     print(env.aviary.elapsed_time)

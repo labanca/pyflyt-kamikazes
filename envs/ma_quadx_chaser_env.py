@@ -141,7 +141,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 14,),
+            shape=(self.combined_space.shape[0] + 3,),
             dtype=np.float64,
         )
 
@@ -185,9 +185,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         self.previous_magnitude = self.current_magnitude.copy()
         self.previous_distance = self.current_distance.copy()
-        self.previous_angles = self.current_angles.copy()
-        self.previous_vel_angles = self.current_vel_angles.copy()
-        self.previous_rel_vel_magnitude = self.current_rel_vel_magnitude.copy()
+        #self.previous_angles = self.current_angles.copy()
+        #self.previous_vel_angles = self.current_vel_angles.copy()
+        #self.previous_rel_vel_magnitude = self.current_rel_vel_magnitude.copy()
 
         # get the states of all drones
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
@@ -216,20 +216,20 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
-        for id in range(self.ground_velocities.shape[0]):
-            separation = self.drone_positions[id] - self.drone_positions
-
-            for i in range(self.separation.shape[0]):
-                dot_products = np.dot(separation[i] ,ground_velocities[i],)
-                norm_vectors = np.linalg.norm(separation[i]) * np.linalg.norm(ground_velocities[i])
-                cosines = dot_products / (norm_vectors + 1e-10)
-                self.current_vel_angles[id][i] = np.arccos(cosines)
-
-        self.current_vel_angles = self.current_vel_angles.T
-        self.in_cone = np.array(self.current_vel_angles < self.lethal_angle)  # lethal angle = 0.15
-        self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
-        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
-        self.approaching = self.current_distance < self.previous_distance
+        # for id in range(self.ground_velocities.shape[0]):
+        #     separation = self.drone_positions[id] - self.drone_positions
+        #
+        #     for i in range(self.separation.shape[0]):
+        #         dot_products = np.dot(separation[i] ,ground_velocities[i],)
+        #         norm_vectors = np.linalg.norm(separation[i]) * np.linalg.norm(ground_velocities[i])
+        #         cosines = dot_products / (norm_vectors + 1e-10)
+        #         self.current_vel_angles[id][i] = np.arccos(cosines)
+        #
+        # self.current_vel_angles = self.current_vel_angles.T
+        # self.in_cone = np.array(self.current_vel_angles < self.lethal_angle)  # lethal angle = 0.15
+        # self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
+        # self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
+        # self.approaching = self.current_distance < self.previous_distance
         self.hit_probability = np.maximum(0.9 - self.current_rel_vel_magnitude/self.max_velocity_magnitude, 0.01)
 
 
@@ -302,6 +302,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         else:
             hit_probability = 0.0
 
+        current_action = np.array(self.current_actions[agent_id])
+
         if self.save_step_data:
             self.observation_dict = dict(
                 step_count=self.step_count,
@@ -324,54 +326,53 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 hit_probability=hit_probability,
             )
 
-        # depending on angle representation, return the relevant thing
-        if self.angle_representation == 0:
-            return np.array(
-                [
-                    *self.normalize_angular(ang_vel),
-                    *self.normalize_angular(ang_pos),
-                    *self.normalize_linear(lin_vel),
-                    *self.normalize_linear(lin_pos),
-                    *agent_aux_state,
-                    *self.past_actions[agent_id],
-
-                    *self.normalize_angular(ally_ang_vel),
-                    *self.normalize_angular(ally_delta_ang_pos),
-                    *self.normalize_linear(ally_delta_lin_vel),
-                    *self.normalize_linear(ally_delta_lin_pos),
-
-                    *self.normalize_angular(target_ang_vel),
-                    *self.normalize_angular(target_delta_ang_pos),
-                    *self.normalize_linear(target_delta_lin_vel),
-                    *self.normalize_linear(target_delta_lin_pos),
-                    self.normalize_linear(target_distance),
-                    hit_probability,
-
-                ]
-            )
-        elif self.angle_representation == 1:
-
+        if self.observation_type == 0:
             return np.array(
                 [
                     *ang_vel,
                     *ang_pos,
                     *lin_vel,
                     *lin_pos,
+                    *self.current_actions[agent_id],
                     *agent_aux_state,
-                    *self.past_actions[agent_id],
+                    #*self.past_actions[agent_id],
                     #agent_direction,
 
-                    *(target_delta_lin_vel),
-                    *(target_delta_lin_pos),
+                    #*(target_lin_vel),
+                    *target_lin_pos,
                     #separation_direction,
                     target_distance,
-                    hit_probability,
+                    #hit_probability,
 
-                    0 if near_ally_id == -1 else 1,
-                    *(ally_delta_lin_vel),
-                    *(ally_delta_lin_pos),
+                    #0 if near_ally_id == -1 else 1,
+                    #*(ally_delta_lin_vel),
+                    #*(ally_delta_lin_pos),
                 ]
             )
+        elif self.observation_type == 1:
+            return np.array(
+                [
+                    *ang_vel,
+                    *ang_pos,
+                    *lin_vel,
+                    *lin_pos,
+                    *self.current_actions[agent_id],
+                    *agent_aux_state,
+                    #*self.past_actions[agent_id],
+                    #agent_direction,
+
+                    #*(target_lin_vel),
+                    *target_lin_pos,
+                    #separation_direction,
+                    target_distance,
+                    #hit_probability,
+
+                    #0 if near_ally_id == -1 else 1,
+                    #*(ally_delta_lin_vel),
+                    #*(ally_delta_lin_pos),
+                ]
+            )
+
         else:
             raise AssertionError("Not supposed to end up here!")
 
@@ -463,6 +464,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 r = self.explosion_radius
                 collision_distance = max(d - r, 0.1)
                 self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+                self.rew_speed_magnitude[agent_id] = -1.0
 
         elif self.reward_type == 3:
 

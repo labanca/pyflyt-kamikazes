@@ -18,8 +18,8 @@ spawn_settings = dict(
     lm_spawn_radius=2,
     min_z=1,
     seed=None,
-    num_lw=5,
-    num_lm=5,
+    num_lw=1,
+    num_lm=1,
 )
 
 flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']

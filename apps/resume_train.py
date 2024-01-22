@@ -152,20 +152,11 @@ if __name__ == "__main__":
     model_dir = 'ma_quadx_chaser_20240117-174627'
     model_name = 'a'
 
-    steps = 4_000_000
-    num_resumes = 2
+    steps = 1_000_000
+    num_resumes = 1
     reset_model = False
 
     for i in range(num_resumes):
-
-        if i == 1:
-            train_kwargs['lr'] = 0.001
-            model_name = 'a'
-
-        if i == 2:
-            train_kwargs['lr'] = 0.001
-            train_kwargs['discount_factor'] = 0.98
-            model_name = 'a'
 
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,

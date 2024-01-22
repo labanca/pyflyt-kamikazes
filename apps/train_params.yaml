@@ -45,20 +45,20 @@ env_kwargs:
   max_velocity_magnitude: 10.0
   thrust_limit: 10.0
   explosion_radius: 0.5
-  reward_type: 4
+  reward_type: 3
   rew_exploding_target: 100.0
-  distance_factor: 10.0
+  distance_factor: 30.0
   proximity_factor: 0.1
-  speed_factor: 0.1
+  speed_factor: 0.4
   save_step_data: false
 
 train_kwargs:
-  device: cpu
-  batch_size: 512
+  device: cuda
+  batch_size: 2048
   lr: 0.001
-  discount_factor: 0.995
+  discount_factor: 0.99
   nn_t:
-    - 256
-    - 256
-    - 512
-  num_vec_envs: 8
+    - 128
+    - 128
+    - 128
+  num_vec_envs: 16
