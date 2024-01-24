@@ -55,6 +55,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         reward_type: int = 0,
         explosion_radius: float = 0.5,
         thrust_limit: float = 10.0,
+        angular_rate_limit: float = np.pi,
     ):
         """__init__.
 
@@ -93,23 +94,24 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         # action space flight_mode 6: vx, vy, vr, vz
         self.thrust_limit = thrust_limit
+        self.angular_rate_limit = angular_rate_limit
 
         self.action_bounds = 1
 
         high = np.array(
             [
-                self.thrust_limit,
-                self.thrust_limit,
-                self.thrust_limit,
+                angular_rate_limit,
+                angular_rate_limit,
+                angular_rate_limit,
                 self.thrust_limit,
             ]
         )
         low = np.array(
             [
-                -self.thrust_limit,
-                -self.thrust_limit,
-                -self.thrust_limit,
-                -self.thrust_limit,
+                -angular_rate_limit,
+                -angular_rate_limit,
+                -angular_rate_limit,
+                0.0,
             ]
         )
         self._action_space = spaces.Box(low=low, high=high, dtype=np.float64)
@@ -352,7 +354,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             if v == 'lw'
         ]
 
-        if self.render_mode is not None:
+        if self.render_mode:
             self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0],  lineWidth=2) for id in range(3)]
             self.change_visuals()
             #self.init_debug_vectors()
@@ -363,7 +365,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.aviary.register_all_new_bodies()
 
         # set flight mode
-        flight_modes = [6 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping)) ]
+        flight_modes = [0 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping)) ]
 
         self.aviary.set_mode(flight_modes)
 
@@ -377,7 +379,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                                  shoot_range=self.lw_shoot_range,
                                  )
 
-        if self.render_mode is not None:
+        if self.render_mode:
             self.aviary.resetDebugVisualizerCamera(cameraDistance=0.1, cameraYaw=0, cameraPitch=0,
                                             cameraTargetPosition=self.formation_center)
             self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
@@ -389,7 +391,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         #         + 2 * self.flight_dome_size * self.distance_factor
         #         + self.env_step_ratio * 100
         # )
-        self.action_scaling = np.array([self.thrust_limit, self.thrust_limit, np.pi, self.thrust_limit])
+        #self.action_scaling = np.array([self.thrust_limit, self.thrust_limit, np.pi, self.thrust_limit])
 
         # wait for env to stabilize
         for _ in range(10):
@@ -562,7 +564,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
-                self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
+                #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
                 #self.draw_vel_vector(ag_id, line_id=self.debuglines[ag_id])
 
                 # compute term trunc reward

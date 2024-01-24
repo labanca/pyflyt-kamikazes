@@ -9,7 +9,7 @@ from modules.utils import generate_start_pos_orn, read_yaml_file
 
 seed=None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240121-013002/ma_quadx_chaser-7000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240123-133240/ma_quadx_chaser-5000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -17,12 +17,12 @@ model = PPO.load(model_path)
 params_path = f'{model_folder}/{model_name}.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([ [10, 1, 1], [0, 0, 1] ])
+start_pos = np.array([ [10, 1, 1], [0, 0, 7] ])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
 env_kwargs['num_lm'] = 1
 env_kwargs['spawn_settings'] = None
-env_kwargs['formation_center'] = np.array([0,0,1])
+env_kwargs['formation_center'] = np.array([0, 0, 1])
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=seed)

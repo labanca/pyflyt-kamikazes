@@ -7,7 +7,7 @@ from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 #model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240121-213703/ma_quadx_chaser-4000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240123-173636/ma_quadx_chaser-11000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)

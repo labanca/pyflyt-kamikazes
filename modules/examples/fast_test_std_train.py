@@ -9,7 +9,7 @@ from modules.utils import generate_start_pos_orn, read_yaml_file
 
 seed=None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240121-132008/ma_quadx_chaser-4000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240123-133240/ma_quadx_chaser-5000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -17,7 +17,7 @@ model = PPO.load(model_path)
 params_path = f'modules/examples/train_params_test.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([ [-4, -4, 1], [0, 0, 1] ])
+start_pos = np.array([ [-10, -7, 1], [0, 0, 1] ])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
 env_kwargs['num_lm'] = 1

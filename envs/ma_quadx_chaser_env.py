@@ -88,6 +88,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         reward_type: int = 0,
         explosion_radius: float = 0.5,
         thrust_limit: float = 10.0,
+        angular_rate_limit: float = np.pi,
     ):
         """__init__.
 
@@ -131,6 +132,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             reward_type=reward_type,
             explosion_radius=explosion_radius,
             thrust_limit=thrust_limit,
+            angular_rate_limit=angular_rate_limit,
 
         )
 
@@ -183,7 +185,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             None:
         """
 
-        self.previous_magnitude = self.current_magnitude.copy()
+        #self.previous_magnitude = self.current_magnitude.copy()
         self.previous_distance = self.current_distance.copy()
         #self.previous_angles = self.current_angles.copy()
         #self.previous_vel_angles = self.current_vel_angles.copy()
@@ -193,27 +195,27 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
         self.linear_velocities = self.attitudes[:, 2]
         self.drone_positions = self.attitudes[:, 3]
-        self.current_magnitude = np.linalg.norm(self.linear_velocities, axis=-1)
+        #self.current_magnitude = np.linalg.norm(self.linear_velocities, axis=-1)
 
 
         # rotation matrix and forward vectors
-        self.rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
+        #self.rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
 
         # compute the separation vectors and distance of each drone to each drone
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
         # opponent velocity is relative to ours in our body frame
-        ground_velocities: np.ndarray = (
-            self.rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
-        ).reshape(self.attitudes.shape[0], 3)
+        # ground_velocities: np.ndarray = (
+        #     self.rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
+        # ).reshape(self.attitudes.shape[0], 3)
 
-        self.ground_velocities = ground_velocities
+        #self.ground_velocities = ground_velocities
 
         # relative ground relative velocities and ground relative magnitude
-        self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
+        #self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
         self.current_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
-        self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
+        #self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
         # for id in range(self.ground_velocities.shape[0]):
@@ -335,18 +337,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     *lin_pos,
                     *self.current_actions[agent_id],
                     *agent_aux_state,
-                    #*self.past_actions[agent_id],
-                    #agent_direction,
-
-                    #*(target_lin_vel),
                     *target_lin_pos,
-                    #separation_direction,
                     target_distance,
-                    #hit_probability,
-
-                    #0 if near_ally_id == -1 else 1,
-                    #*(ally_delta_lin_vel),
-                    #*(ally_delta_lin_pos),
                 ]
             )
         elif self.observation_type == 1:
@@ -367,9 +359,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     target_distance,
                     #hit_probability,
 
-                    #0 if near_ally_id == -1 else 1,
-                    #*(ally_delta_lin_vel),
-                    #*(ally_delta_lin_pos),
+                    0 if near_ally_id == -1 else 1,
+                    *ally_lin_pos,
+                    ally_distance,
                 ]
             )
 
@@ -481,6 +473,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 d = self.current_distance[agent_id][target_id]
                 collision_distance = max(d, 0.05)
                 self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+                self.rew_speed_magnitude[agent_id] = -1.0
 
         elif self.reward_type == 4:
 
