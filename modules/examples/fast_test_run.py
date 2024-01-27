@@ -1,16 +1,15 @@
+import time
 from pathlib import Path
 
-from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
-from stable_baselines3 import PPO
 import numpy as np
-import time
 
-#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
+# model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
 from modules.utils import generate_start_pos_orn
 
-seed=None
+seed = None
 
-#print((os.cpu_count() or 1))
+# print((os.cpu_count() or 1))
 spawn_settings = dict(
     lw_center_bounds=2.0,
     lm_center_bounds=2.0,
@@ -22,7 +21,8 @@ spawn_settings = dict(
     num_lm=1,
 )
 
-flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']
+flight_dome_size = spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius'] + spawn_settings[
+    'lw_center_bounds'] + spawn_settings['lm_center_bounds']
 start_pos, _, _ = generate_start_pos_orn(**spawn_settings)
 
 start_orn = np.zeros_like(start_pos)
@@ -64,23 +64,19 @@ i = 1
 last_start_pos = env_kwargs['start_pos']
 while env.agents:
 
-
     actions = {agent: env.action_space(agent).sample() for agent in env.agents}
-    #actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+    # actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
-
-    #actions['agent_0'] = np.array([-3, -3, 0, 0]) # np.array([i, i, 0, 0.123*i])
-    #actions['agent_1'] = np.array([4, 4, 0, 0.8])
-    #actions['agent_2'] = np.array([-5, -2, 0, 0.8])
-    #actions['agent_3'] = np.array([0, 0, 0, 0])
-    i +=1
+    # actions['agent_0'] = np.array([-3, -3, 0, 0]) # np.array([i, i, 0, 0.123*i])
+    # actions['agent_1'] = np.array([4, 4, 0, 0.8])
+    # actions['agent_2'] = np.array([-5, -2, 0, 0.8])
+    # actions['agent_3'] = np.array([0, 0, 0, 0])
+    i += 1
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
 
-
     if first_time == True:
         first_time = False
-
 
     if any(terminations.values()) or any(truncations.values()):
 
@@ -97,13 +93,12 @@ while env.agents:
         time.sleep(0)
         env.write_step_data(Path('modules/examples/step_data.csv'))
         env.write_obs_data(Path('modules/examples/obs_data.csv'))
-        #env.plot_rewards_data('reward_data.csv')
-        #env.plot_agent_rewards('reward_data.csv', 0)
-        #env.plot_agent_infos2('reward_data.csv', 0)
+        # env.plot_rewards_data('reward_data.csv')
+        # env.plot_agent_rewards('reward_data.csv', 0)
+        # env.plot_agent_infos2('reward_data.csv', 0)
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')
-
 
     if num_games == 0:
         print(counters)
@@ -111,5 +106,3 @@ while env.agents:
         break
 
 env.close()
-
-

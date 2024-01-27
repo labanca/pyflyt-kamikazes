@@ -6,28 +6,25 @@ Author: Elliot (https://github.com/elliottower)
 """
 from __future__ import annotations
 
-import stable_baselines3.common.monitor
-import yaml
-
 import glob
 import os
 import time
 from datetime import datetime
 
 import supersuit as ss
-from stable_baselines3 import PPO
-from stable_baselines3.common.logger import configure
-from stable_baselines3.ppo import MlpPolicy
-from stable_baselines3.common.utils import get_device
 from gymnasium.utils import EzPickle
 from pettingzoo.utils import parallel_to_aec
-from modules.callbacks import TensorboardCallback
+from stable_baselines3 import PPO
+from stable_baselines3.common.logger import configure
+from stable_baselines3.common.utils import get_device
+from stable_baselines3.ppo import MlpPolicy
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
+from modules.callbacks import TensorboardCallback
 
 
 def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', **env_kwargs
+        env_fn, steps: int = 10_000, seed: int | None = 0, train_desc='', **env_kwargs
 ):
     # Train a single model to play as each agent in a cooperative Parallel environment
     env = env_fn(**env_kwargs)
@@ -36,15 +33,15 @@ def train_butterfly_supersuit(
 
     print(f"Starting training on {str(env.metadata['name'])}.")
 
-    env = ss.black_death_v3(env,)
-    env = ss.pettingzoo_env_to_vec_env_v1(env )
+    env = ss.black_death_v3(env, )
+    env = ss.pettingzoo_env_to_vec_env_v1(env)
 
     num_vec_envs = 16
     num_cpus = num_vec_envs
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3")
 
     device = get_device('cpu')
-    batch_size = 512 # 512 davi
+    batch_size = 512  # 512 davi
     lr = 1e-4
     discount_factor = 0.99
     nn_t = [128, 128, 128]
@@ -54,12 +51,11 @@ def train_butterfly_supersuit(
 
     folder_name = f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}"
     model_name = f"{env.unwrapped.metadata.get('name')}-{steps}"
-    folder_path = os.path.join("apps\\models", folder_name,)
-    #log_path = os.path.join(folder_path, 'tensorboard')
-    filename = os.path.join(folder_path, model_name )
+    folder_path = os.path.join("apps\\models", folder_name, )
+    # log_path = os.path.join(folder_path, 'tensorboard')
+    filename = os.path.join(folder_path, model_name)
 
     log_dir = os.path.join(folder_path, 'logs', model_name)
-
 
     model = PPO(
         MlpPolicy,
@@ -73,7 +69,6 @@ def train_butterfly_supersuit(
         tensorboard_log=log_dir
     )
 
-
     new_logger = configure(log_dir, ["csv", "tensorboard"])
     model.set_logger(new_logger)
 
@@ -86,7 +81,6 @@ def train_butterfly_supersuit(
     print("Model has been saved.")
 
     print(f"Finished training on {model_name}.")
-
 
     with open(f'{filename}.txt', 'w') as file:
         # Write train params to file
@@ -122,13 +116,12 @@ def train_butterfly_supersuit(
         file.write(f'{model.policy_aliases=}\n')
         file.write(f'{model.policy_class=}\n')
 
-
     env.close()
 
 
 def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwargs):
     # Evaluate a trained agent vs a random agent
-    env = env_fn(render_mode=render_mode, **env_kwargs )
+    env = env_fn(render_mode=render_mode, **env_kwargs)
     env = parallel_to_aec(env)
 
     print(
@@ -159,12 +152,12 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
 
             for a in env.agents:
                 rewards[a] += env.rewards[a]
-            if truncation : #and info.get('mission_complete') == True
+            if truncation:  # and info.get('mission_complete') == True
                 print(f'terminate with {agent=} {termination=} {truncation=} {info=}')
                 break
             else:
                 act = model.predict(obs, deterministic=True)[0]
-                #act = np.array([1,1,0,0])
+                # act = np.array([1,1,0,0])
             if termination != last_term:
                 print(f'| A agent terminated |')
                 print(f'{obs=}')
@@ -174,13 +167,11 @@ def eval(env_fn, num_games: int = 100, render_mode: str | None = None, **env_kwa
                 print(f'{reward=}\n')
                 print(f'{info}')
             env.step(act)
-            #print(f'{reward=}')
-
-
+            # print(f'{reward=}')
 
     env.close()
 
-    avg_reward_per_agent = sum(rewards.values()) / len(rewards.values()  )
+    avg_reward_per_agent = sum(rewards.values()) / len(rewards.values())
     avg_reward_per_game = sum(rewards.values()) / num_games
     print("\nRewards: ", rewards)
     print(f"Avg reward per agent: {avg_reward_per_agent}")
@@ -209,7 +200,8 @@ if __name__ == "__main__":
     )
 
     env_kwargs = {}
-    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
+    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
+        'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
     env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
                                       + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']) * 1.5
     env_kwargs['seed'] = spawn_settings['seed']
@@ -217,10 +209,10 @@ if __name__ == "__main__":
     env_kwargs['num_lm'] = spawn_settings['num_lm']
     env_kwargs['num_lw'] = spawn_settings['num_lw']
     env_kwargs['max_duration_seconds'] = 30
-    env_kwargs['reward_coef'] =1.0
+    env_kwargs['reward_coef'] = 1.0
     env_kwargs['lw_stand_still'] = False
 
-    #seed = 42
+    # seed = 42
     train_desc = """new train, lw on.
 
             # reward for closing the distance
@@ -242,12 +234,10 @@ if __name__ == "__main__":
             )
 """
 
-
-
-    #Train a model
+    # Train a model
     train_butterfly_supersuit(env_fn, steps=1_000_000, train_desc=train_desc, **env_kwargs)
 
     # Evaluate 10 games (average reward should be positive but can vary significantly)
-    #eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
+    # eval(env_fn, num_games=10, render_mode=None, **env_kwargs)
 
-    #eval(env_fn, num_games=1, render_mode="human", **env_kwargs)
+    # eval(env_fn, num_games=1, render_mode="human", **env_kwargs)

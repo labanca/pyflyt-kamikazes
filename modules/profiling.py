@@ -15,7 +15,6 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
 
 
 def main():
-
     env_fn = EZPEnv
 
     train_desc = """ take ma_quadx_chaser_20240116-142312 and train with the speed vector reward with diffent speed_factor values, trying to gain overall speed"""

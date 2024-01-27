@@ -6,25 +6,24 @@ from typing import Any
 
 import numpy as np
 import pybullet as p
+from PyFlyt.core import Aviary
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
-
-from PyFlyt.core import Aviary
 
 
 class MAFixedwingBaseEnv(ParallelEnv):
     """Base Dogfighting Environment for the Aggressor model using custom environment API."""
 
     def __init__(
-        self,
-        start_pos: np.ndarray = np.array([[0.0, 0.0, 1.0]]),
-        start_orn: np.ndarray = np.array([[0.0, 0.0, 0.0]]),
-        assisted_flight: bool = True,
-        flight_dome_size: float = 150.0,
-        max_duration_seconds: float = 60.0,
-        angle_representation: str = "euler",
-        agent_hz: int = 30,
-        render_mode: None | str = None,
+            self,
+            start_pos: np.ndarray = np.array([[0.0, 0.0, 1.0]]),
+            start_orn: np.ndarray = np.array([[0.0, 0.0, 0.0]]),
+            assisted_flight: bool = True,
+            flight_dome_size: float = 150.0,
+            max_duration_seconds: float = 60.0,
+            angle_representation: str = "euler",
+            agent_hz: int = 30,
+            render_mode: None | str = None,
     ):
         """__init__.
 
@@ -47,7 +46,7 @@ class MAFixedwingBaseEnv(ParallelEnv):
 
         if render_mode is not None:
             assert (
-                render_mode in self.metadata["render_modes"]
+                    render_mode in self.metadata["render_modes"]
             ), f"Invalid render mode {render_mode}, only {self.metadata['render_modes']} allowed."
         self.render_mode = render_mode is not None
 
@@ -85,13 +84,13 @@ class MAFixedwingBaseEnv(ParallelEnv):
         """CONSTANTS"""
         # check the start_pos shapes
         assert (
-            len(start_pos.shape) == 2
+                len(start_pos.shape) == 2
         ), f"Expected `start_pos` to be of shape [num_agents, 3], got {start_pos.shape}."
         assert (
-            start_pos.shape[-1] == 3
+                start_pos.shape[-1] == 3
         ), f"Expected `start_pos` to be of shape [num_agents, 3], got {start_pos.shape}."
         assert (
-            start_pos.shape == start_orn.shape
+                start_pos.shape == start_orn.shape
         ), f"Expected `start_pos` to be of shape [num_agents, 3], got {start_pos.shape}."
         self.start_pos = start_pos
         self.start_orn = start_orn
@@ -211,7 +210,7 @@ class MAFixedwingBaseEnv(ParallelEnv):
         return self.aviary.aux_state(agent_id)
 
     def compute_attitude_by_id(
-        self, agent_id: int
+            self, agent_id: int
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """state.
 
@@ -247,7 +246,7 @@ class MAFixedwingBaseEnv(ParallelEnv):
         raise NotImplementedError
 
     def compute_base_term_trunc_info_by_id(
-        self, agent_id: int
+            self, agent_id: int
     ) -> tuple[bool, bool, dict[str, Any]]:
         """compute_base_term_trunc_reward_by_id."""
         # initialize
@@ -271,7 +270,7 @@ class MAFixedwingBaseEnv(ParallelEnv):
         return term, trunc, info
 
     def compute_term_trunc_reward_info_by_id(
-        self, agent_id: int
+            self, agent_id: int
     ) -> tuple[bool, bool, float, dict[str, Any]]:
         """compute_term_trunc_reward_info_by_id.
 
@@ -284,7 +283,7 @@ class MAFixedwingBaseEnv(ParallelEnv):
         raise NotImplementedError
 
     def step(
-        self, actions: dict[str, np.ndarray]
+            self, actions: dict[str, np.ndarray]
     ) -> tuple[
         dict[str, Any],
         dict[str, float],

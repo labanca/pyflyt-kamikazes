@@ -6,7 +6,7 @@ spawn_settings: &spawn_settings
   min_z: 1
   seed: null
   num_lw: &num_lw 1
-  num_lm: &num_lm 1
+  num_lm: &num_lm 4
 
 env_kwargs:
   start_pos:

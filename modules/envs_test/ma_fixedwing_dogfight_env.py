@@ -4,9 +4,8 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from gymnasium import spaces
-
 from PyFlyt.pz_envs.fixedwing_envs.ma_fixedwing_base_env import MAFixedwingBaseEnv
+from gymnasium import spaces
 
 
 # fix numpy buggy cross
@@ -32,17 +31,17 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
     }
 
     def __init__(
-        self,
-        spawn_height: float = 15.0,
-        damage_per_hit: float = 0.02,
-        lethal_distance: float = 15.0,
-        lethal_angle_radians: float = 0.1,
-        assisted_flight: bool = True,
-        sparse_reward: bool = False,
-        flight_dome_size: float = 150.0,
-        max_duration_seconds: float = 60.0,
-        agent_hz: int = 30,
-        render_mode: None | str = None,
+            self,
+            spawn_height: float = 15.0,
+            damage_per_hit: float = 0.02,
+            lethal_distance: float = 15.0,
+            lethal_angle_radians: float = 0.1,
+            assisted_flight: bool = True,
+            sparse_reward: bool = False,
+            flight_dome_size: float = 150.0,
+            max_duration_seconds: float = 60.0,
+            agent_hz: int = 30,
+            render_mode: None | str = None,
     ):
         """__init__.
 
@@ -110,7 +109,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         return start_pos, start_orn
 
     def reset(
-        self, seed: None | int = None, options: dict[str, Any] = dict()
+            self, seed: None | int = None, options: dict[str, Any] = dict()
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """reset.
 
@@ -121,7 +120,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         Returns:
             tuple[dict[str, Any], dict[str, Any]]:
         """
-        self.start_pos, self.start_orn = self.start_pos, self.start_orn #self._get_start_pos_orn(seed)
+        self.start_pos, self.start_orn = self.start_pos, self.start_orn  # self._get_start_pos_orn(seed)
 
         # define custom forward velocity
         _, start_vec = self.compute_rotation_forward(self.start_orn)
@@ -216,16 +215,16 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
 
         # opponent velocity is relative to ours in our body frame
         ground_velocities: np.ndarray = (
-            rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
+                rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
         ).reshape(2, 3)
         opponent_velocities = (
-            np.expand_dims(ground_velocities, axis=1)[::-1] @ rotation
+                np.expand_dims(ground_velocities, axis=1)[::-1] @ rotation
         ).reshape(2, 3)
         opponent_attitudes[:, 2] = opponent_velocities - self.attitudes[:, 2]
 
         # opponent position is relative to ours in our body frame
         opponent_attitudes[:, 3] = (
-            np.expand_dims(separation, axis=1) @ rotation
+                np.expand_dims(separation, axis=1) @ rotation
         ).reshape(2, 3)
 
         # flatten the attitude and opponent attitude, expand dim of health
@@ -269,18 +268,18 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         if not self.sparse_reward:
             # reward for closing the distance
             self.rewards += (
-                np.clip(
-                    self.previous_distance - self.current_distance,
-                    a_min=0.0,
-                    a_max=None,
-                )
-                * (~self.in_range & self.chasing)
-                * 1.0
+                    np.clip(
+                        self.previous_distance - self.current_distance,
+                        a_min=0.0,
+                        a_max=None,
+                    )
+                    * (~self.in_range & self.chasing)
+                    * 1.0
             )
 
             # reward for progressing to engagement
             self.rewards += (
-                (self.previous_angles - self.current_angles) * self.in_range * 10.0
+                    (self.previous_angles - self.current_angles) * self.in_range * 10.0
             )
 
             # reward for engaging the enemy
@@ -293,7 +292,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         self.rewards -= 20.0 * self.current_hits[::-1]
 
     def compute_term_trunc_reward_info_by_id(
-        self, agent_id: int
+            self, agent_id: int
     ) -> tuple[bool, bool, float, dict[str, Any]]:
         """Computes the termination, truncation, and reward of the current timestep."""
         term, trunc, info = super().compute_base_term_trunc_info_by_id(agent_id)
@@ -351,7 +350,7 @@ class MAFixedwingDogfightEnv(MAFixedwingBaseEnv):
         return rz @ ry @ rx, forward_vector
 
     def step(
-        self, actions: dict[str, np.ndarray]
+            self, actions: dict[str, np.ndarray]
     ) -> tuple[
         dict[str, Any],
         dict[str, float],

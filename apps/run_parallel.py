@@ -1,19 +1,27 @@
-import yaml
-from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
-from stable_baselines3 import PPO
 from pathlib import Path
-import numpy as np
+
+from stable_baselines3 import PPO
+
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
-#model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240123-173636/ma_quadx_chaser-11000000.zip')
+# model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240126-163936/saved_models/model_7800000.zip')
 model_name = model_path.stem
+
 model_folder = model_path.parent
+if 'saved_models' in model_folder.parts:
+    model_folder = model_folder.parent
 model = PPO.load(model_path)
 
-params_path = f'{model_folder}/{model_name}.yaml'
-spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+try:
+    params_path = f'{model_folder}/{model_name}.yaml'
+    spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+except:
+    params_path = f'{model_folder}\\saved_models\\train_params.yaml' # {model_folder.name}
+    spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+#spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=spawn_settings['seed'])
@@ -26,7 +34,7 @@ num_games = 1
 
 while env.agents:
     print(env.aviary.elapsed_time)
-    #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    # actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
@@ -54,13 +62,12 @@ while env.agents:
         print(f'{terminations=}')
         print(f'{truncations=}\n')
         print(f'{infos=}\n\n\n')
-        #time.sleep(5)
+        # time.sleep(5)
         if env.save_step_data:
             env.write_step_data(Path(model_folder, 'run-data', f'{model_name}.csv'))
             env.write_obs_data(Path(model_folder, 'run-data', f'obs-{model_name}.csv'))
-        #env.plot_agent_rewards('reward_data.csv', 0)
-        #env.plot_agent_infos2('reward_data.csv', 0)
-
+        # env.plot_agent_rewards('reward_data.csv', 0)
+        # env.plot_agent_infos2('reward_data.csv', 0)
 
         num_games -= 1
 
@@ -71,5 +78,3 @@ while env.agents:
         break
 
 env.close()
-
-

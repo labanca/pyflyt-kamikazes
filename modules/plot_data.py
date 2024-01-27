@@ -1,11 +1,11 @@
-import pandas as pd
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+
 matplotlib.use('TkAgg')
 
+
 def plot_rewards_data(self, filename):
-
-
     # Read the CSV file into a DataFrame
     df = pd.read_csv(filename)
 
@@ -22,7 +22,6 @@ def plot_rewards_data(self, filename):
     plt.legend()
     plt.grid(True)
     plt.show()
-
 
 
 def plot_agent_rewards(filename, agent_id):
@@ -46,6 +45,6 @@ def plot_agent_rewards(filename, agent_id):
     plt.grid(True)
     plt.show()
 
+
 # Example usage:
 plot_agent_rewards('C:/projects/pyflyt-kamikazes/apps/reward_data.csv', agent_id=0)
-
