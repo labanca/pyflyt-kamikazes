@@ -472,14 +472,14 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 # does no consider explosion_radius in distance
                 d = self.current_distance[agent_id][target_id]
                 collision_distance = max(d, 0.05)
-                self.rew_close_to_target[agent_id] = 1 / collision_distance
+                self.rew_close_to_target[agent_id] = 1 / (collision_distance + 0.005)
+
+            self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
             # target_lin_pos = self.drone_positions[target_id]
             # lin_pos = self.drone_positions[agent_id]
             # separation_direction = (target_lin_pos - lin_pos) / (np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
             # agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
-
-            self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
         self.rew_closing_distance[agent_id] *= self.distance_factor
         self.rew_close_to_target[agent_id] *= self.proximity_factor
