@@ -38,9 +38,7 @@ def test_aviary():
 
 
 def test_plot_vectors():
-
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
 
     # Drone positions and forward vectors
     drone_a_position = np.array([1, 0, 0])
@@ -59,8 +57,10 @@ def test_plot_vectors():
 
     # Plot drone forward vectors as arrows
     arrow_len = 0.5  # Adjust arrow length as needed
-    ax.quiver(drone_a_position[0], drone_a_position[1], drone_a_position[2], drone_a_forward[0], drone_a_forward[1], drone_a_forward[2], arrow_length=arrow_len, color='blue', label='Drone A Forward')
-    ax.quiver(drone_b_position[0], drone_b_position[1], drone_b_position[2], drone_b_forward[0], drone_b_forward[1], drone_b_forward[2], arrow_length=arrow_len, color='red', label='Drone B Forward')
+    ax.quiver(drone_a_position[0], drone_a_position[1], drone_a_position[2], drone_a_forward[0], drone_a_forward[1],
+              drone_a_forward[2], arrow_length=arrow_len, color='blue', label='Drone A Forward')
+    ax.quiver(drone_b_position[0], drone_b_position[1], drone_b_position[2], drone_b_forward[0], drone_b_forward[1],
+              drone_b_forward[2], arrow_length=arrow_len, color='red', label='Drone B Forward')
 
     # Set labels and title
     ax.set_xlabel('X')
@@ -71,5 +71,6 @@ def test_plot_vectors():
     # Add legend and show the plot
     ax.legend()
     plt.show()
+
 
 test_aviary()

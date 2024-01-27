@@ -1,13 +1,12 @@
-
 from __future__ import annotations
 
-import numpy as np
-
-from gymnasium import spaces
 from typing import Any
 
+import numpy as np
+from gymnasium import spaces
 
 from envs.ma_quadx_base_env import MAQuadXBaseEnv
+
 
 def _np_cross(x, y) -> np.ndarray:
     """__np_cross.
@@ -20,7 +19,6 @@ def _np_cross(x, y) -> np.ndarray:
         np.ndarray:
     """
     return np.cross(x, y)
-
 
 
 class MAQuadXChaserEnv(MAQuadXBaseEnv):
@@ -47,31 +45,46 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
     }
 
     def __init__(
-        self,
-        spawn_settings: dict(),
-        start_pos: np.ndarray = np.array(
-            [[-1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [-1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
-        ),
-        start_orn: np.ndarray = np.array(
-            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-        ),
-        sparse_reward: bool = False,
-        flight_dome_size: float = 10.0,
-        max_duration_seconds: float = 30.0,
-        angle_representation: str = "quaternion",
-        agent_hz: int = 30,
-        render_mode: None | str = None,
-        uav_mapping: np.array = np.array(['lm', 'lm', 'lm', 'lm']),
-        seed : int = None,
-        num_lm: int = 1,
-        num_lw: int = 1,
-        formation_center: np.ndarray = np.array(
-            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-        ),
-        distance_factor: float = 1.0,
-        speed_factor: float = 1.0,
-        lw_stand_still: bool = False,
-        rew_exploding_target: float = 1000.0
+            self,
+            spawn_settings: dict(),
+            start_pos: np.ndarray = np.array(
+                [[-1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [-1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+            ),
+            start_orn: np.ndarray = np.array(
+                [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+            ),
+            sparse_reward: bool = False,
+            flight_dome_size: float = 10.0,
+            angle_representation: str = "quaternion",
+            render_mode: None | str = None,
+            uav_mapping: np.array = np.array(['lm', 'lm', 'lm', 'lm']),
+            seed: int = None,
+            formation_center: np.ndarray = np.array(
+                [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+            ),
+            lw_stand_still: bool = True,
+            lw_moves_random: bool = False,
+            lw_chases: bool = False,
+            lw_attacks: bool = False,
+            lw_threat_radius: float = 4.0,
+            lw_shoot_range: float = 1.0,
+            lethal_angle: float = 0.15,
+            lethal_distance: float = 2.0,
+            agent_hz: int = 30,
+            max_duration_seconds: float = 30.0,
+            num_lm: int = 1,
+            num_lw: int = 1,
+            distance_factor: float = 1.0,
+            proximity_factor: float = 1.0,
+            speed_factor: float = 1.0,
+            rew_exploding_target: float = 100,
+            max_velocity_magnitude: float = 10,
+            save_step_data: bool = False,
+            reward_type: int = 0,
+            observation_type: int = 0,
+            explosion_radius: float = 0.5,
+            thrust_limit: float = 1.0,
+            angular_rate_limit: float = np.pi,
     ):
         """__init__.
 
@@ -95,15 +108,30 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             render_mode=render_mode,
             spawn_settings=spawn_settings,
             seed=seed,
+            lw_stand_still=lw_stand_still,
+            lw_moves_random=lw_moves_random,
+            lw_chases=lw_chases,
+            lw_attacks=lw_attacks,
+            lw_threat_radius=lw_threat_radius,
+            lw_shoot_range=lw_shoot_range,
             num_lm=num_lm,
             num_lw=num_lw,
             formation_center=formation_center,
             distance_factor=distance_factor,
+            proximity_factor=proximity_factor,
             speed_factor=speed_factor,
-            lw_stand_still=lw_stand_still,
-            rew_exploding_target=rew_exploding_target
-        )
+            rew_exploding_target=rew_exploding_target,
+            max_velocity_magnitude=max_velocity_magnitude,
+            save_step_data=save_step_data,
+            lethal_angle=lethal_angle,
+            lethal_distance=lethal_distance,
+            reward_type=reward_type,
+            observation_type=observation_type,
+            explosion_radius=explosion_radius,
+            thrust_limit=thrust_limit,
+            angular_rate_limit=angular_rate_limit,
 
+        )
 
         self.sparse_reward = sparse_reward
         self.spawn_setting = spawn_settings
@@ -112,7 +140,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self._observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.combined_space.shape[0] + 19,),
+            shape=(self.combined_space.shape[0] + 3,),
             dtype=np.float64,
         )
 
@@ -134,13 +162,13 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         super().begin_reset(seed, options)
 
-
         super().end_reset(seed, options)
 
         observations = {
             ag: self.compute_observation_by_id(self.agent_name_mapping[ag])
             for ag in self.agents
         }
+
         infos = {ag: dict() for ag in self.agents}
         return observations, infos
 
@@ -153,16 +181,17 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             None:
         """
 
-        self.past_magnitude = self.current_magnitude.copy()
+        # self.previous_magnitude = self.current_magnitude.copy()
         self.previous_distance = self.current_distance.copy()
-        self.previous_angles = self.current_angles.copy()
-        self.previous_vel_angles = self.current_vel_angles
-        self.previous_rel_vel_magnitude = self.current_rel_vel_magnitude
+        # self.previous_angles = self.current_angles.copy()
+        # self.previous_vel_angles = self.current_vel_angles.copy()
+        # self.previous_rel_vel_magnitude = self.current_rel_vel_magnitude.copy()
 
         # get the states of all drones
         self.attitudes = np.stack(self.aviary.all_states, axis=0, dtype=np.float64)
         self.linear_velocities = self.attitudes[:, 2]
         self.drone_positions = self.attitudes[:, 3]
+        # self.current_magnitude = np.linalg.norm(self.linear_velocities, axis=-1)
 
         # rotation matrix and forward vectors
         self.rotation, self.forward_vecs = self.compute_rotation_forward(self.attitudes[:, 1])
@@ -171,8 +200,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.separation = self.attitudes[:, -1][:, np.newaxis, :] - self.attitudes[:, -1]
         self.current_distance = np.linalg.norm(self.separation, axis=-1)
 
-        # opponent velocity is relative to ours in our body frame
-        # TODO check with draw
+        #opponent velocity is relative to ours in our body frame
         ground_velocities: np.ndarray = (
             self.rotation @ np.expand_dims(self.attitudes[:, -2], axis=-1)
         ).reshape(self.attitudes.shape[0], 3)
@@ -181,23 +209,25 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # relative ground relative velocities and ground relative magnitude
         self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
+        #self.current_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
-        for id in range(self.ground_velocities.shape[0]):
-            separation = self.drone_positions[id] - self.drone_positions
-
-            for i in range(self.separation.shape[0]):
-                dot_products = np.dot(separation[i] ,ground_velocities[i],)
-                norm_vectors = np.linalg.norm(separation[i]) * np.linalg.norm(ground_velocities[i])
-                cosines = dot_products / (norm_vectors + 1e-10)
-                self.current_vel_angles[id][i] = np.arccos(cosines)
-
-        self.current_vel_angles = self.current_vel_angles.T
-        self.in_cone = self.current_vel_angles < self.lethal_angle # lethal angle = 0.15
-        self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 1.0
-        self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
-        self.approaching = self.current_distance < self.previous_distance
+        # for id in range(self.ground_velocities.shape[0]):
+        #     separation = self.drone_positions[id] - self.drone_positions
+        #
+        #     for i in range(self.separation.shape[0]):
+        #         dot_products = np.dot(separation[i] ,ground_velocities[i],)
+        #         norm_vectors = np.linalg.norm(separation[i]) * np.linalg.norm(ground_velocities[i])
+        #         cosines = dot_products / (norm_vectors + 1e-10)
+        #         self.current_vel_angles[id][i] = np.arccos(cosines)
+        #
+        # self.current_vel_angles = self.current_vel_angles.T
+        # self.in_cone = np.array(self.current_vel_angles < self.lethal_angle)  # lethal angle = 0.15
+        # self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
+        # self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
+        # self.approaching = self.current_distance < self.previous_distance
+        self.hit_probability = np.maximum(0.9 - self.current_rel_vel_magnitude / self.max_velocity_magnitude, 0.05)
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
@@ -207,182 +237,260 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         Returns:
             np.ndarray:
+
+        attitude is (4, 3) array, where:
+            - `state[0, :]` represents body frame angular velocity
+            - `state[1, :]` represents ground frame angular position
+            - `state[2, :]` represents body frame linear velocity
+            - `state[3, :]` represents ground frame linear position
         """
+
+        # ids
 
         target_id = self.find_nearest_lw(agent_id)
         near_ally_id = self.find_nearest_lm(agent_id, exclude_self=True)
 
-        raw_state = self.compute_attitude_by_id(agent_id)
-        aux_state = self.compute_auxiliary_by_id(agent_id)
-        ang_vel, ang_pos, lin_vel, lin_pos, quartenion = raw_state
-        rotation = np.array(self.aviary.getMatrixFromQuaternion(quartenion)).reshape(3, 3)
+        # states
+        agent_state = self.compute_attitude_by_id(agent_id)
+        agent_aux_state = self.compute_auxiliary_by_id(agent_id)
+        target_state = self.compute_attitude_by_id(target_id)
+        ally_state = self.compute_attitude_by_id(near_ally_id)
 
-        rel_lin_vel = self.ground_velocities[agent_id]
+        ang_vel, ang_pos, lin_vel, lin_pos, quaternion = agent_state
+        target_ang_vel, target_ang_pos, target_lin_vel, target_lin_pos, target_quaternion = target_state
+        ally_ang_vel, ally_ang_pos, ally_lin_vel, ally_lin_pos, ally_quaternion = ally_state
 
-        if near_ally_id != -1:
-            ally_rel_lin_vel = self.ground_velocities[near_ally_id]
+        # agent rotation matrix
+        agent_rotation = np.array(self.aviary.getMatrixFromQuaternion(quaternion)).reshape(3, 3)
+        # delta_lin_vel = np.matmul((lin_vel), agent_rotation)
+        # delta_ang_vel = np.matmul((ang_vel), agent_rotation)
 
+        # target dynamics relative to the agent
+        target_delta_lin_pos = np.matmul((target_lin_pos - lin_pos), agent_rotation)
+        target_ang_vel = target_ang_vel  # unchanged
+        target_delta_ang_pos = ang_pos - target_ang_pos
+        target_delta_lin_vel = np.matmul((target_lin_vel - lin_vel), agent_rotation)
+        target_distance = float(np.linalg.norm(target_delta_lin_pos))
 
-            ally_lin_pos = self.drone_positions[near_ally_id]
-            ally_rel_lin_pos= np.matmul((ally_lin_pos - lin_pos), rotation)
+        if near_ally_id == -1:
+            ally_delta_lin_pos = np.array([False, False, False]) # np.random.uniform(-10,10)
+            ally_ang_vel = np.array([False, False, False])
+            ally_delta_ang_pos = np.array([False, False, False])
+            ally_delta_lin_vel = np.array([False, False, False])
+            ally_distance = False
         else:
-            ally_rel_lin_vel = np.array([False, False, False])
-            ally_rel_lin_pos = np.array([False, False, False])
+            ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
+            ally_ang_vel = ally_ang_vel  # unchanged
+            ally_delta_ang_pos = ang_pos - ally_ang_pos
+            ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
+            ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
 
-        # target_attitude = self.aviary.state(target_id)
-        target_attitude = self.compute_attitude_by_id(target_id)
-        ang_vel_target, ang_pos_target, lin_vel_target, lin_pos_target, quarternion_target = target_attitude
-        hit_probability = max(0.9 - self.current_rel_vel_magnitude[agent_id][target_id] /self.lw_manager.max_velocity, 0.05)
+        # direction and separation relative to the ground frame
+        # error division agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
+        # separation_direction = (target_lin_pos - lin_pos)/(np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
 
-        lin_rel_vel_target = self.ground_velocities[target_id]
+        if len(self.targets):
+            if self.lw_manager.squad[target_id - self.num_lm].gun_loaded:
+                hit_probability = self.hit_probability[agent_id][target_id]
+            else:
+                hit_probability = 0.001
+        else:
+            hit_probability = 0.001
 
-        # drone to target
+        current_action = np.array(self.current_actions[agent_id])
 
-        lin_rel_pos_target = np.matmul((lin_pos_target - lin_pos), rotation)
+        if self.save_step_data:
+            self.observation_dict = dict(
+                step_count=self.step_count,
+                agent_id=agent_id,
+                ang_vel=ang_vel,
+                ang_pos=ang_pos,
+                lin_vel=lin_vel,
+                lin_pos=lin_pos,
+                agent_aux_state=agent_aux_state,
+                past_actions=self.past_actions[agent_id],
+                ally_ang_vel=ally_ang_vel,
+                ally_delta_ang_pos=ally_delta_ang_pos,
+                ally_delta_lin_vel=ally_delta_lin_vel,
+                ally_delta_lin_pos=ally_delta_lin_pos,
+                target_ang_vel=target_ang_vel,
+                target_delta_ang_pos=target_delta_ang_pos,
+                target_delta_lin_vel=target_delta_lin_vel,
+                target_delta_lin_pos=target_delta_lin_pos,
+                target_distance=target_distance,
+                hit_probability=hit_probability,
+            )
 
-        # depending on angle representation, return the relevant thing
-        if self.angle_representation == 0:
+        if self.observation_type == 0:
             return np.array(
                 [
                     *ang_vel,
                     *ang_pos,
-                    *rel_lin_vel,
+                    *lin_vel,
                     *lin_pos,
-                    *aux_state,
-                    *self.past_actions[agent_id],
-                    self.current_rel_vel_magnitude[agent_id][target_id],
-
-                    *ally_rel_lin_vel,
-                    *ally_rel_lin_pos,
-
-                    *ang_vel_target,
-                    *ang_pos_target,
-                    *lin_rel_vel_target,
-                    *lin_rel_pos_target,
-                    hit_probability,
+                    *self.current_actions[agent_id],
+                    *agent_aux_state,
+                    *target_delta_lin_pos,
+                    target_distance,
                 ]
             )
-        elif self.angle_representation == 1:
+        elif self.observation_type == 1:
             return np.array(
                 [
                     *ang_vel,
                     *ang_pos,
-                    *rel_lin_vel,
+                    *lin_vel,
                     *lin_pos,
-                    *aux_state,
-                    *self.past_actions[agent_id],
-                    self.current_rel_vel_magnitude[agent_id][target_id],
+                    *self.current_actions[agent_id],
+                    *agent_aux_state,
+                    *target_lin_pos,
+                    target_distance,
+                    0 if near_ally_id == -1 else 1,
+                    *ally_lin_pos,
+                    ally_distance,
 
-                    *ally_rel_lin_vel,
-                    *ally_rel_lin_pos,
-
-                    *ang_vel_target,
-                    *ang_pos_target,
-                    *lin_rel_vel_target,
-                    *lin_rel_pos_target,
-                    hit_probability,
                 ]
             )
+
         else:
             raise AssertionError("Not supposed to end up here!")
 
-
     def compute_term_trunc_reward_info_by_id(
-        self, agent_id: int
+            self, agent_id: int
     ) -> tuple[bool, bool, float, dict[str, Any]]:
         """Computes the termination, truncation, and reward of the current timestep."""
+
         term, trunc, reward, info = super().compute_base_term_trunc_reward_info_by_id(agent_id)
 
-        self._compute_engagement_rewards_old(agent_id)
+        self._compute_engagement_rewards(agent_id)
 
         reward += self.rewards[agent_id]
 
-        self.compute_collisions(agent_id)
-
-        if term:
-            self.disarm_drone(agent_id)
+        # rescale reward
+        #reward = reward
 
         return term, trunc, reward, info
-
-    def _compute_engagement_rewards_old(self, agent_id) -> None:
-        """_compute_engagement_rewards."""
-        # reset rewards
-        self.rewards[agent_id] *= 0.0
-        ag = self.drone_id_mapping[agent_id]
-        target_id = self.find_nearest_lw(agent_id)
-        self.current_target_id[agent_id] = target_id # stores targets
-
-        # sparse reward computation
-        if not self.sparse_reward:
-
-            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
-
-                self.rew_closing_distance[agent_id] = np.clip(
-                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=0,
-                    a_max=None,
-                ) * (
-                    self.chasing[agent_id][target_id]
-                )
-
-                # reward for maintaning linear velocities.
-                self.rew_speed_magnitude[agent_id] = (
-                        (self.current_magnitude[agent_id] ** 2)
-                        * self.chasing[agent_id][target_id]
-                        * self.approaching[agent_id][target_id]
-                        * 1.0
-                )
-
-            self.rewards[agent_id] += (
-                    self.rew_closing_distance[agent_id]
-                    + self.rew_engaging_enemy[agent_id]
-                    + self.rew_speed_magnitude[agent_id]
-                    + self.rew_near_engagement[agent_id]
-            )
-
 
     def _compute_engagement_rewards(self, agent_id) -> None:
         """_compute_engagement_rewards."""
         # reset rewards
         self.rewards[agent_id] *= 0.0
-        ag = self.drone_id_mapping[agent_id]
         target_id = self.find_nearest_lw(agent_id)
-        self.current_target_id[agent_id] = target_id # stores targets
+        self.current_target_id[agent_id] = target_id  # stores targets
 
-        # sparse reward computation
-        if not self.sparse_reward:
+        if target_id == agent_id:
+            self.rewards[agent_id] = 0
+            return
 
-            if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
+        if self.reward_type == 0:
 
-                # reward for closing the distance
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
                 self.rew_closing_distance[agent_id] = np.clip(
-                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=0.0,
-                    a_max=None,
-                )
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
 
                 exploding_distance = self.current_distance[agent_id][target_id] - 0.5
-
                 self.rew_close_to_target[agent_id] = 1 / (exploding_distance
                                                           if exploding_distance > 0
                                                           else 0.09)  # if the 1 is to hight the kamikazes will circle the enemy. try a
 
-                # self.rew_close_to_target[agent_id] = - exploding_distance / (self.initial_distance - 0.11)
+                self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
-                self.rew_speed_magnitude[agent_id] = (
-                                        self.current_rel_vel_magnitude[agent_id][target_id] - self.previous_rel_vel_magnitude[agent_id][target_id]) * (
-                                        self.in_range[agent_id][target_id]
-                                        * self.in_cone[agent_id][target_id]
-                                        )
+                self.rew_near_engagement[agent_id] = (self.rew_closing_distance[agent_id]
+                                                      * self.in_range[agent_id][target_id]
+                                                      * self.in_cone[agent_id][target_id]
+                                                      * 100.0
+                                                      )
+
+        # waypoint_rew - separation vector
+        elif self.reward_type == 1:
+
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                separation = self.drone_positions[target_id] - self.drone_positions[agent_id]
+                norm = np.linalg.norm(separation)
+
+                direction = separation / (norm if norm > 0 else 1)
+                intensity = 5
+                vx, vy, vz = direction * intensity
+
+                self.desired_vel = np.array([vx, vy, 0, vz])
+                self.rew_speed_magnitude[agent_id] = -np.linalg.norm(self.desired_vel - self.past_actions[agent_id])
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                distance = self.current_distance[agent_id][target_id]
+                self.rew_close_to_target[agent_id] = 1 / (distance if distance > 0 else 0.09)
 
 
+        elif self.reward_type == 2:
 
-            self.rewards[agent_id] += (
-                                      self.rew_closing_distance[agent_id]
-                                      + self.rew_close_to_target[agent_id] * self.distance_factor
-                                      + self.rew_speed_magnitude[agent_id] * self.speed_factor
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
 
-            )
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                d = self.current_distance[agent_id][target_id]
+                r = self.explosion_radius
+                collision_distance = max(d - r, 0.1)
+                self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+                self.rew_speed_magnitude[agent_id] = -1.0
+
+        elif self.reward_type == 3:
+
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                # does no consider explosion_radius in distance
+                d = self.current_distance[agent_id][target_id]
+                collision_distance = max(d, 0.05)
+                self.rew_close_to_target[agent_id] = 1 / (collision_distance + 0.005)
+
+                self.rew_speed_magnitude[agent_id] = -1.0
+
+        elif self.reward_type == 4:
+
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                # does no consider explosion_radius in distance
+                d = self.current_distance[agent_id][target_id]
+                collision_distance = max(d, 0.05)
+                self.rew_close_to_target[agent_id] = 1 / collision_distance
+
+            # target_lin_pos = self.drone_positions[target_id]
+            # lin_pos = self.drone_positions[agent_id]
+            # separation_direction = (target_lin_pos - lin_pos) / (np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
+            # agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
+
+            self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
+
+        self.rew_closing_distance[agent_id] *= self.distance_factor
+        self.rew_close_to_target[agent_id] *= self.proximity_factor
+        self.rew_speed_magnitude[agent_id] *= self.speed_factor
+
+        self.rewards[agent_id] += (
+                self.rew_closing_distance[agent_id]
+                + self.rew_close_to_target[agent_id]
+                + self.rew_speed_magnitude[agent_id]
+                + self.rew_near_engagement[agent_id]
+        )
 
     @staticmethod
     def compute_rotation_forward(orn: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -421,24 +529,21 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
 
-    def print_rewards(self, agent_id, **kargs):
-        for k,v in kargs.items():
-            print(f'{agent_id} {k} = {v}')
-
-        print(f'{self.current_magnitude[agent_id]=}')
-        print(f'{self.current_vel_angles[agent_id][1]=}')
-        print(f'------------------------------------------------------------')
-
     def write_step_data(self, filename):
         # write the rewards data to a file
         import csv
 
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = [ "aviary_steps", "physics_steps", "step_count", "agent_id", "elapsed_time",
-                          "rew_closing_distance", "rew_close_to_target", "rew_engaging_enemy", "rew_speed_magnitude", "rew_near_engagement", "acc_rewards",
-                          "vel_angles", "rel_vel_magnitudade", "approaching", "chasing", "in_range", "in_cone", "current_term",
-                          "info[downed]", "info[exploded_target]", "info[exploded_ally]",  "info[crashes]", "info[ally_collision]", "info[is_success]",
-                            "info[mission_complete]", "info[out_of_bounds]", "info[timeover]"
+            fieldnames = ["aviary_steps", "physics_steps", "step_count", "agent_id", "elapsed_time",
+                          "rew_closing_distance", "rew_close_to_target", "rew_engaging_enemy", "rew_speed_magnitude",
+                          "rew_near_engagement", "acc_rewards",
+                          "vel_angles", "rel_vel_magnitudade", "approaching", "chasing", "in_range", "in_cone",
+                          "current_term",
+                          "info[downed]", "info[exploded_target]", "info[exploded_ally]", "info[crashes]",
+                          "info[ally_collision]", "info[is_success]",
+                          "info[mission_complete]", "info[out_of_bounds]", "info[timeover]"
                           ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -449,7 +554,29 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             for step_data in self.rewards_data:
                 writer.writerow(step_data)
 
-    def plot_rewards_data(self,filename):
+    def write_obs_data(self, filename):
+        # write the rewards data to a file
+        import csv
+
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ["step_count", "agent_id", "ang_vel", "ang_pos", "lin_vel", "lin_pos", "agent_aux_state",
+                          "past_actions",
+                          "ally_ang_vel", "ally_delta_ang_pos", "ally_delta_lin_vel", "ally_delta_lin_pos",
+                          "target_ang_vel", "target_delta_ang_pos", "target_delta_lin_vel", "target_delta_lin_pos",
+                          "target_distance", "hit_probability"
+                          ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
+
+            # Write the data
+            for obs_data in self.obs_data:
+                writer.writerow(obs_data)
+
+    def plot_rewards_data(self, filename):
         import pandas as pd
         import matplotlib.pyplot as plt
         import matplotlib
@@ -492,9 +619,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         plt.plot(agent_data['elapsed_time'], agent_data['rew_speed_magnitude'], label='Speed Magnitude')
         plt.plot(agent_data['elapsed_time'], agent_data['rew_near_engagement'], label='Near Engagement')
         plt.plot(agent_data['elapsed_time'], agent_data['rel_vel_magnitudade'], label='rel_vel_magnitudade')
-        #plt.plot(agent_data['elapsed_time'], agent_data['vel_angles'], label='vel_angles')
-        #plt.plot(agent_data['elapsed_time'], agent_data['chasing'], label='chasing')
-
+        # plt.plot(agent_data['elapsed_time'], agent_data['vel_angles'], label='vel_angles')
+        # plt.plot(agent_data['elapsed_time'], agent_data['chasing'], label='chasing')
 
         plt.xlabel('Elapsed Time')
         plt.ylabel('Rewards')
@@ -526,8 +652,6 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         plt.plot(agent_data['elapsed_time'], agent_data['info[mission_complete]'], label='mission_complete')
         plt.plot(agent_data['elapsed_time'], agent_data['info[ally_collision]'], label='ally_collision')
         plt.plot(agent_data['elapsed_time'], agent_data['info[downed]'], label='downed')
-
-
 
         plt.xlabel('Elapsed Time')
         plt.ylabel('Rewards')

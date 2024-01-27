@@ -1,41 +1,30 @@
-from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
+from pathlib import Path
+
 from stable_baselines3 import PPO
-import numpy as np
-import time
 
-#model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-8438336.zip')
-model = PPO.load('apps/models/ma_quadx_chaser_20240105-210345/ma_quadx_chaser-1024000.zip')
-seed=None
+from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
+from modules.utils import *
 
-#print((os.cpu_count() or 1))
-spawn_settings = dict(
-    lw_center_bounds=5.0,
-    lm_center_bounds=5.0,
-    lw_spawn_radius=1.0,
-    lm_spawn_radius=5.0,
-    min_z=1.0,
-    seed=None,
-    num_lw=1,
-    num_lm=3,
-)
+# model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
+# model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240126-163936/saved_models/model_7800000.zip')
+model_name = model_path.stem
 
+model_folder = model_path.parent
+if 'saved_models' in model_folder.parts:
+    model_folder = model_folder.parent
+model = PPO.load(model_path)
 
-env_kwargs = {}
-env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                  + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds'])  # dome size 50% bigger than the spawn radius
-env_kwargs['seed'] = seed
-env_kwargs['spawn_settings'] = spawn_settings
-env_kwargs['num_lm'] = spawn_settings['num_lm']
-env_kwargs['num_lw'] = spawn_settings['num_lw']
-env_kwargs['max_duration_seconds'] = 15.0
-env_kwargs['distance_factor'] = 1.0
-env_kwargs['speed_factor'] = 10.0
-env_kwargs['lw_stand_still'] = False
-env_kwargs['rew_exploding_target'] = 1000
+try:
+    params_path = f'{model_folder}/{model_name}.yaml'
+    spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+except:
+    params_path = f'{model_folder}\\saved_models\\train_params.yaml' # {model_folder.name}
+    spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
+#spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
-observations, infos = env.reset(seed=seed)
+observations, infos = env.reset(seed=spawn_settings['seed'])
 
 last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
@@ -44,9 +33,8 @@ first_time = True
 num_games = 1
 
 while env.agents:
-
-
-    #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+    print(env.aviary.elapsed_time)
+    # actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
@@ -61,12 +49,12 @@ while env.agents:
 
     last_term = terminations
 
-    if any(terminations.values()) or any(truncations.values()):
-
-        for agent_key, agent_data in infos.items():
-            for key, value in agent_data.items():
-                if key in counters:
-                    counters[key] += 1
+    # if any(terminations.values()) or any(truncations.values()):
+    #
+    #     for agent_key, agent_data in infos.items():
+    #         for key, value in agent_data.items():
+    #             if key in counters:
+    #                 counters[key] += 1
 
     if all(terminations.values()) or all(truncations.values()):
         print(f'********* EPISODE END **********\n')
@@ -74,21 +62,19 @@ while env.agents:
         print(f'{terminations=}')
         print(f'{truncations=}\n')
         print(f'{infos=}\n\n\n')
-        #time.sleep(5)
-        env.write_step_data('reward_data.csv')
-        #env.plot_agent_rewards('reward_data.csv', 0)
-        #env.plot_agent_infos2('reward_data.csv', 0)
+        # time.sleep(5)
+        if env.save_step_data:
+            env.write_step_data(Path(model_folder, 'run-data', f'{model_name}.csv'))
+            env.write_obs_data(Path(model_folder, 'run-data', f'obs-{model_name}.csv'))
+        # env.plot_agent_rewards('reward_data.csv', 0)
+        # env.plot_agent_infos2('reward_data.csv', 0)
 
-
-        #observations, infos = env.reset(seed=seed)
         num_games -= 1
+
         print(f'Remaining games: {num_games}')
 
     if num_games == 0:
-        print(counters)
+        print(env.info_counters)
         break
 
-
 env.close()
-
-

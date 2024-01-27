@@ -8,24 +8,23 @@ from __future__ import annotations
 
 import os
 import time
-import inspect
 from datetime import datetime
+from pathlib import Path
 
 import supersuit as ss
+from gymnasium.utils import EzPickle
 from stable_baselines3 import PPO
 from stable_baselines3.common.logger import configure
-from stable_baselines3.common.utils import get_device
 from stable_baselines3.ppo import MlpPolicy
-from gymnasium.utils import EzPickle
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.callbacks import TensorboardCallback
+from modules.utils import *
 
 
 def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int | None = 0, train_desc = '', model_name='', model_dir='',
-        env_kwargs={}, train_kwargs={} ):
-
+        env_fn, steps: int = 10_000, seed: int | None = 0, train_desc='', model_name='', model_dir='',
+        env_kwargs={}, train_kwargs={}):
     """ Train a single model to play as each agent in a cooperative Parallel environment """
 
     # unpack train kwargs
@@ -42,7 +41,7 @@ def train_butterfly_supersuit(
     env = env_fn(**env_kwargs)
     env.reset(seed=seed)
     env = ss.black_death_v3(env)
-    env = ss.pettingzoo_env_to_vec_env_v1(env,)
+    env = ss.pettingzoo_env_to_vec_env_v1(env, )
     env = ss.concat_vec_envs_v1(env, num_vec_envs, num_cpus=num_cpus, base_class="stable_baselines3", )
 
     model_path = os.path.join('apps\\models', model_dir, model_name)
@@ -69,9 +68,11 @@ def train_butterfly_supersuit(
         new_logger = configure(log_dir, ["csv", "tensorboard"])
         model.set_logger(new_logger)
 
-        callback = TensorboardCallback(verbose=1)
+        callback = TensorboardCallback(verbose=1, save_path=folder_name,
+                                       save_freq=200_000, check_freq=1000, log_dir=log_dir)
 
-        model.learn(total_timesteps=steps, callback=callback, progress_bar=True)
+        model.learn(total_timesteps=steps, callback=callback, progress_bar=False)
+
         model.save(filename)
 
         print(f"Model {model_name} has been saved.")
@@ -84,16 +85,16 @@ def train_butterfly_supersuit(
 
         new_total_timesteps = model.num_timesteps + steps
         new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
-        folder_name = os.path.join("apps\\models", model_dir )
+        folder_name = os.path.join("apps\\models", model_dir)
         filename = os.path.join(folder_name, new_model_name)
         log_dir = os.path.join(folder_name, 'logs', new_model_name)
 
         new_logger = configure(log_dir, ["csv", "tensorboard"])
         model.set_logger(new_logger)
-        callback = TensorboardCallback(verbose=1)
+        callback = TensorboardCallback(verbose=1, save_path=folder_name, save_freq=100_000)
 
         print(f"Starting resume training on {model_name}")
-        model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback )
+        model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback)
         model.save(filename)
 
         print(f"Model {new_model_name} has been saved.")
@@ -107,29 +108,14 @@ def train_butterfly_supersuit(
         file.write(f'{__file__=}\n')
         file.write(f'model.start_datetime={start_datetime}\n')
         file.write(f'elapsed_time={elapsed_time}\n')
-        file.write(f'model_name={model_name}\n')
-        file.write(f'model_name={new_model_name}\n')
+        file.write(f'completion_datetime={current_time}\n')
         file.write(f'{model.num_timesteps=:n}\n')
-        file.write(f'lw_stand_still={env_kwargs["lw_stand_still"]}\n')
-        file.write(f'{device=}\n')
-        file.write(f'{seed=}\n')
-        file.write(f'{batch_size=}\n')
-        file.write(f'{model.learning_rate=}\n')
-        file.write(f'{discount_factor=}\n')
-        file.write(f'{nn_t=}\n')
-        file.write(f'{num_cpus=}\n')
-        file.write(f'{num_vec_envs=}\n')
         file.write(f'{model.n_envs=}\n')
         file.write(f'{model.n_steps=}\n')
         file.write(f'{model.n_epochs=}\n')
         file.write(f'{model.batch_size=}\n')
-        file.write(f'random_respawn={True if spawn_settings != None else False}\n')
-        file.write(f'{spawn_settings=}\n')
-        file.write(f'completion_datetime={current_time}\n')
         file.write(f'{model.action_space=}\n')
         file.write(f'{model.observation_space=}\n')
-        file.write(f'{env_kwargs=}\n')
-        file.write(f'{train_kwargs=}\n')
         file.write(f'{model.policy_kwargs=}\n')
         file.write(f'{model.policy=}\n')
         file.write(f'{model.policy_aliases=}\n')
@@ -146,83 +132,31 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
         MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
+def sizeof_fmt(num, suffix='B'):
+    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f %s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f %s%s" % (num, 'Yi', suffix)
+
+
 if __name__ == "__main__":
     env_fn = EZPEnv
 
-    train_desc = """ LW on and many agents since the beggining, rew_coef higher . 
-                            
-                if target_id != agent_id:  #avoid the scenario where there are no targets, returns the last rewards in the last steps
+    train_desc = """  """
 
-                # reward for closing the distance
-                self.rew_closing_distance[agent_id] = np.clip(
-                    self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id],
-                    a_min=-10.0,
-                    a_max=None,
-                )  
+    params_path = 'apps/train_params.yaml'
+    spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-                
+    root_dir = 'apps/models'
+    model_dir = 'ma_quadx_chaser_20240125-160507'
+    model_name = 'zip'
 
-                exploding_distance = self.current_distance[agent_id][target_id] - 0.5
+    steps = 15_000_000
+    num_resumes = 1
+    reset_model = False
 
-                self.rew_close_to_target[agent_id] = - exploding_distance
-                 
-                # self.rew_close_to_target[agent_id] = 1 / (exploding_distance
-                #                                 if exploding_distance > 0
-                #                                 else 0.09)   #if the 1 is to hight the kamikazes will circle the enemy. try a
-
-
-            self.rewards[agent_id] += (
-                    self.rew_closing_distance[agent_id]
-                    + self.rew_close_to_target[agent_id] * self.reward_coef #* (1 - self.step_count/self.max_steps) # regularizations
-
-            )
-            
-            
-
-"""
-
-    spawn_settings = dict(
-        lw_center_bounds=10.0,
-        lw_spawn_radius=2.0,
-        lm_center_bounds=5.0,
-        lm_spawn_radius=10.0,
-        min_z=0.5,
-        seed=None,
-        num_lw=1,
-        num_lm=2,
-    )
-
-    env_kwargs = {}
-    env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs['formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-    env_kwargs['flight_dome_size'] = (spawn_settings['lw_spawn_radius'] + spawn_settings['lm_spawn_radius']
-                                      + spawn_settings['lw_center_bounds'] + spawn_settings['lm_center_bounds']) * 1.5
-    env_kwargs['seed'] = spawn_settings['seed']
-    env_kwargs['spawn_settings'] = spawn_settings
-    env_kwargs['num_lm'] = spawn_settings['num_lm']
-    env_kwargs['num_lw'] = spawn_settings['num_lw']
-    env_kwargs['max_duration_seconds'] = 15
-    env_kwargs['distance_factor'] = 0.1
-    env_kwargs['speed_factor'] = 1.0
-    env_kwargs['lw_stand_still'] = False
-    env_kwargs['rew_exploding_target'] = 200
-
-    nn_t = [128, 128, 128]
-    train_kwargs = dict(
-        device=get_device('cuda'),
-        batch_size=512,
-        lr=1e-4,
-        discount_factor=0.99,
-        nn_t=nn_t,
-        num_vec_envs=16,
-    )
-
-
-    model_dir = 'ma_quadx_chaser_20240107-202245'
-    model_name = 'a'
-
-    steps = 1024 * 1000
-
-    num_resumes = 3
     for i in range(num_resumes):
 
         model_name, model_dir = train_butterfly_supersuit(
@@ -230,50 +164,7 @@ if __name__ == "__main__":
             model_name=model_name, model_dir=model_dir,
             env_kwargs=env_kwargs, train_kwargs=train_kwargs)
 
-        if (i+1) % 5 == 0:
-
-            spawn_settings['num_lm'] += 1
-            env_kwargs['num_lm'] = spawn_settings['num_lm']
-            env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
-                'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-            env_kwargs['spawn_settings'] = spawn_settings
-
-        if (i+1) % 10 == 0:
-
-            env_kwargs['speed_factor'] += 5.0
-            spawn_settings['num_lm'] += 1
-            spawn_settings['num_lw'] += 1
-            env_kwargs['num_lm'] = spawn_settings['num_lm']
-            env_kwargs['num_lw'] = spawn_settings['num_lw']
-            env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
-                'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-            env_kwargs['spawn_settings'] = spawn_settings
-
-
-
-        # if i == 10:
-        #     spawn_settings['num_lm'] = 6
-        #     spawn_settings['num_lw'] = 2
-        #     env_kwargs['num_lm'] = spawn_settings['num_lm']
-        #     env_kwargs['num_lw'] = spawn_settings['num_lw']
-        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
-        #         'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-        #     env_kwargs['spawn_settings'] = spawn_settings
-        #
-        # if i == 15:
-        #     spawn_settings['num_lm'] = 9
-        #     spawn_settings['num_lw'] = 3
-        #     env_kwargs['num_lm'] = spawn_settings['num_lm']
-        #     env_kwargs['num_lw'] = spawn_settings['num_lw']
-        #     env_kwargs['start_pos'], env_kwargs['start_orn'], env_kwargs[
-        #         'formation_center'] = MAQuadXChaserEnv.generate_start_pos_orn(**spawn_settings)
-        #     env_kwargs['spawn_settings'] = spawn_settings
-        #
-        #
-        # if i == 20:
-        #     env_kwargs['lw_stand_still'] = False
-
-        # if i == 25:
-        #     env_kwargs['reward_coef'] = 1.5
+        save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
+                           Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/
