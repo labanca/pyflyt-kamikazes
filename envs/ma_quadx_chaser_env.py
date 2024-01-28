@@ -136,13 +136,29 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.sparse_reward = sparse_reward
         self.spawn_setting = spawn_settings
 
+
         # observation space
-        self._observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(self.combined_space.shape[0] + 3,),
-            dtype=np.float64,
-        )
+        if self.observation_type == 0:
+            self._observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(self.combined_space.shape[0] + 3,),
+                dtype=np.float64,
+            )
+        elif self.observation_type == 1:
+            self._observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(self.combined_space.shape[0] + 3,),
+                dtype=np.float64,
+            )
+        elif self.observation_type == 2:
+            self._observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(self.combined_space.shape[0] + 9,),
+                dtype=np.float64,
+            )
 
     def observation_space(self, _):
         """observation_space.
@@ -227,7 +243,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         # self.in_range = self.current_distance <= self.lethal_distance # lethal distance = 3.0
         # self.chasing = np.abs(self.current_vel_angles) < (np.pi / 2.0)  # if the drone is chasing another
         # self.approaching = self.current_distance < self.previous_distance
-        self.hit_probability = np.maximum(0.9 - self.current_rel_vel_magnitude / self.max_velocity_magnitude, 0.05)
+        self.hit_probability = np.maximum(0.99 - self.current_rel_vel_magnitude / self.max_velocity_magnitude, 0.05)
 
     def compute_observation_by_id(self, agent_id: int) -> np.ndarray:
         """compute_observation_by_id.
@@ -273,14 +289,14 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_distance = float(np.linalg.norm(target_delta_lin_pos))
 
         if near_ally_id == -1:
-            ally_delta_lin_pos = np.array([False, False, False]) # np.random.uniform(-10,10)
-            ally_ang_vel = np.array([False, False, False])
-            ally_delta_ang_pos = np.array([False, False, False])
-            ally_delta_lin_vel = np.array([False, False, False])
-            ally_distance = False
+            ally_delta_lin_pos = np.array([-3, -3, -3])
+            ally_ang_vel = np.array([-3, -3, -3])
+            ally_delta_ang_pos = np.array([-3, -3, -3])
+            ally_delta_lin_vel = np.array([-3, -3, -3])
+            ally_distance = np.random.uniform(-30) #False
         else:
             ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
-            ally_ang_vel = ally_ang_vel  # unchanged
+            #ally_ang_vel = ally_ang_vel  # unchanged
             ally_delta_ang_pos = ang_pos - ally_ang_pos
             ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
             ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
@@ -343,8 +359,26 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     *lin_pos,
                     *self.current_actions[agent_id],
                     *agent_aux_state,
-                    *target_lin_pos,
+                    *target_delta_lin_pos,
                     target_distance,
+                    0 if near_ally_id == -1 else 1,
+                    *ally_lin_pos,
+                    ally_distance,
+                ]
+            )
+
+        elif self.observation_type == 2:
+            return np.array(
+                [
+                    *ang_vel,
+                    *ang_pos,
+                    *lin_vel,
+                    *lin_pos,
+                    *self.current_actions[agent_id],
+                    *agent_aux_state,
+                    *target_delta_lin_pos,
+                    target_distance,
+                    hit_probability,
                     0 if near_ally_id == -1 else 1,
                     *ally_lin_pos,
                     ally_distance,

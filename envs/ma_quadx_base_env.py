@@ -355,11 +355,12 @@ class MAQuadXBaseEnv(ParallelEnv):
             seed=seed,
         )
 
-        [
-            self.aviary.changeDynamics(self.aviary.drones[k].Id, -1, mass=0.0, localInertiaDiagonal=0.0, )
-            for k, v in self.drone_classes.items()
-            if v == 'lw'
-        ]
+        if self.lw_stand_still:
+            [
+                self.aviary.changeDynamics(self.aviary.drones[k].Id, -1, mass=0.0, localInertiaDiagonal=0.0, )
+                for k, v in self.drone_classes.items()
+                if v == 'lw'
+            ]
 
         if self.render_mode:
             self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0], lineWidth=2)
@@ -392,6 +393,14 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.aviary.resetDebugVisualizerCamera(cameraDistance=0.1, cameraYaw=0, cameraPitch=0,
                                                    cameraTargetPosition=self.formation_center)
             self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
+
+        for id, uav in self.armed_uavs.items():
+            if self.get_drone_type_by_id(id) == 'lw' and self.lw_moves_random:
+                random_setpoint = np.random.uniform(-self.flight_dome_size/np.sqrt(3),self.flight_dome_size/np.sqrt(3), 4)
+                random_setpoint[2] = 0
+                random_setpoint[3] = max(np.random.uniform(self.flight_dome_size/np.sqrt(3)), 0.5)
+                self.aviary.set_setpoint(id, random_setpoint )
+
 
         # max reward value
         # self.max_reward = (

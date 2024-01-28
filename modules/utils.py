@@ -131,3 +131,5 @@ def generate_formation_pos(formation_center, num_drones, radius=0.5, min_z=1.0):
     drone_positions = np.column_stack((x_positions, y_positions, z_positions))
 
     return np.array(drone_positions)
+
+

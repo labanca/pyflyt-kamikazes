@@ -7,7 +7,7 @@ from modules.utils import *
 
 # model_path = Path('apps/models/ma_quadx_chaser_20240111-002615/ma_quadx_chaser-3145728.zip') always chase
 # model_path = Path('apps/models/ma_quadx_chaser_20240117-054612/ma_quadx_chaser-10013504.zip')
-model_path = Path('apps/models/ma_quadx_chaser_20240126-163936/saved_models/model_7800000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_16000000.zip')
 model_name = model_path.stem
 
 model_folder = model_path.parent

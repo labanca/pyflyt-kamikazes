@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240124-015312/ma_quadx_chaser-10000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_12750000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -40,7 +40,7 @@ while env.agents:
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     # always chase
-    actions['agent_0'] = np.array([4, 4, 0, 0.5])  # np.array([i, i, 0, 0.123*i])env.desired_vel
+    #actions['agent_0'] = np.array([4, 4, 0, 0.5])  # np.array([i, i, 0, 0.123*i])env.desired_vel
     # actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     # actions['agent_2'] = np.array([5, 2, 0, 0.8])
     # actions['agent_3'] = np.array([0, 0, 0, 0])

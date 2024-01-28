@@ -46,7 +46,7 @@ env_kwargs:
   thrust_limit: 0.8
   explosion_radius: 0.5
   reward_type: 3
-  observation_type: 0
+  observation_type: 2
   rew_exploding_target: 200.0
   distance_factor: 3.0
   proximity_factor: 0.1
@@ -54,7 +54,7 @@ env_kwargs:
   save_step_data: false
 
 train_kwargs:
-  device: cpu
+  device: cuda
   batch_size: 128
   lr: 0.0001
   discount_factor: 0.98

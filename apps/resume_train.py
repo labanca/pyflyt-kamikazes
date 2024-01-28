@@ -69,7 +69,7 @@ def train_butterfly_supersuit(
         model.set_logger(new_logger)
 
         callback = TensorboardCallback(verbose=1, save_path=folder_name,
-                                       save_freq=200_000, check_freq=1000, log_dir=log_dir)
+                                       save_freq=250_000, check_freq=500, log_dir=log_dir)
 
         model.learn(total_timesteps=steps, callback=callback, progress_bar=False)
 
@@ -91,7 +91,8 @@ def train_butterfly_supersuit(
 
         new_logger = configure(log_dir, ["csv", "tensorboard"])
         model.set_logger(new_logger)
-        callback = TensorboardCallback(verbose=1, save_path=folder_name, save_freq=100_000)
+        callback = TensorboardCallback(verbose=1, save_path=folder_name,
+                                       save_freq=250_000, check_freq=500, log_dir=log_dir)
 
         print(f"Starting resume training on {model_name}")
         model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback)
@@ -110,6 +111,7 @@ def train_butterfly_supersuit(
         file.write(f'elapsed_time={elapsed_time}\n')
         file.write(f'completion_datetime={current_time}\n')
         file.write(f'{model.num_timesteps=:n}\n')
+        file.write(f'{model.device=}\n')
         file.write(f'{model.n_envs=}\n')
         file.write(f'{model.n_steps=}\n')
         file.write(f'{model.n_epochs=}\n')
@@ -150,11 +152,11 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240125-160507'
-    model_name = 'zip'
+    model_dir = 'ma_quadx_chaser_20240127-193805'
+    model_name = 'best_model.zip'
 
-    steps = 15_000_000
-    num_resumes = 1
+    steps = 8_000_000
+    num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):
@@ -166,5 +168,11 @@ if __name__ == "__main__":
 
         save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
+
+
+        env_kwargs['num_lm'] = 2
+        spawn_settings['num_lm'] = 2
+        env_kwargs['lw_stand_still'] = False
+
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/

@@ -126,7 +126,7 @@ class LWManager:
     def update(self, stand_still=False):
 
         for lwfsw in self.squad:
-            if not stand_still:
+            if not stand_still and not self.env.lw_moves_random:
                 lwfsw.update()
 
     def get_squad_setpoints(self):
