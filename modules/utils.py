@@ -70,8 +70,9 @@ def numpy_representer(dumper, data):
 
 
 def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0, num_lw=3, min_z=1.0,
-                           lm_center_bounds=5, lm_spawn_radius=10, num_lm=3, ):
-    np_random = np.random.RandomState(seed=seed)
+                           lm_center_bounds=10, lm_spawn_radius=10, num_lm=3, ):
+    #np.random.seed(seed)
+
     lw_formation_center = [np.random.uniform(-lw_center_bounds, lw_center_bounds),
                            np.random.uniform(-lw_center_bounds, lw_center_bounds),
                            np.random.uniform(min_z, lw_center_bounds + min_z)]
@@ -83,20 +84,24 @@ def generate_start_pos_orn(seed=None, lw_center_bounds=5.0, lw_spawn_radius=1.0,
                        np.random.uniform(-lm_center_bounds, lm_center_bounds),
                        np.random.uniform(min_z, lm_center_bounds + min_z)]
 
-    start_pos_lm = generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
-                                               lm_spawn_center, lm_spawn_radius, num_lm, min_z)
+    start_pos_lm = generate_random_coordinates(seed=seed, lw_formation_center=lw_formation_center,
+                                               lw_center_bounds=lw_center_bounds, lw_spawn_radius=lw_spawn_radius,
+                                               lm_spawn_center=lm_spawn_center, lm_spawn_radius=lm_spawn_radius,
+                                               num_lm=num_lm, min_z=min_z)
 
-    start_orn_lm = (np_random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
+    start_orn_lm = (np.random.rand(num_lm, 3) - 0.5) * 2.0 * np.array([1.0, 1.0, 2 * np.pi])
 
     return np.concatenate([start_pos_lm, start_pos_lw]), np.concatenate(
         [start_orn_lm, start_orn_lw]), lw_formation_center
 
 
-def generate_random_coordinates(lw_formation_center, lw_center_bounds, lw_spawn_radius,
-                                lm_spawn_center, lm_spawn_radius, num_lm, min_z):
+def generate_random_coordinates(seed=None, lw_formation_center=[0,0,1], lw_center_bounds=5.0, lw_spawn_radius=2.0,
+                                lm_spawn_center=[1,1,1], lm_spawn_radius=10.0, num_lm=3, min_z=1.0):
     # Ensure the formation center and spawn center are NumPy arrays
     lw_formation_center = np.array(lw_formation_center)
     lm_spawn_center = np.array(lm_spawn_center)
+
+    #np.random.seed(seed)
 
     # Generate random coordinates within the specified spawn radius and above the minimum z
     lm_coordinates = []

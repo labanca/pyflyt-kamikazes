@@ -268,7 +268,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.step_count = 0
 
-        #np_random = np.random.RandomState(seed=seed)
+
 
         if self.spawn_settings is not None:
             self.start_pos, self.start_orn, self.formation_center = generate_start_pos_orn(**self.spawn_settings)
@@ -605,19 +605,21 @@ class MAQuadXBaseEnv(ParallelEnv):
                     self.append_step_data(ag)
                     self.append_obs_data(self.observation_dict)
 
-        for agent in self.agents:
-            self.compute_collisions(agent)
-            if terminations[agent]:
-                self.disarm_drone(self.agent_name_mapping[agent])
+            for agent in self.agents:
+                self.compute_collisions(agent)
+                if terminations[agent]:
+                    self.disarm_drone(self.agent_name_mapping[agent])
 
-        # increment step count and cull dead agents for the next round
+            # increment step count and cull dead agents for the next round
+
+            self.agents = [
+                agent
+                for agent in self.agents
+                if not (terminations[agent] or truncations[agent])
+            ]
+            self.update_control_lists()
+
         self.step_count += 1
-        self.agents = [
-            agent
-            for agent in self.agents
-            if not (terminations[agent] or truncations[agent])
-        ]
-        self.update_control_lists()
 
         # all targets destroyed, End.
         if self.targets == []:

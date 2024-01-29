@@ -134,15 +134,6 @@ class EZPEnv(EzPickle, MAQuadXChaserEnv):
         MAQuadXChaserEnv.__init__(self, *args, **kwargs)
 
 
-def sizeof_fmt(num, suffix='B'):
-    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
-    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f %s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
 if __name__ == "__main__":
     env_fn = EZPEnv
 
@@ -153,10 +144,10 @@ if __name__ == "__main__":
 
     root_dir = 'apps/models'
     model_dir = 'ma_quadx_chaser_20240127-193805'
-    model_name = 'best_model.zip'
+    model_name = 'a'
 
-    steps = 8_000_000
-    num_resumes = 2
+    steps = 10_000_000
+    num_resumes = 1
     reset_model = False
 
     for i in range(num_resumes):

@@ -2,9 +2,10 @@ import time
 from pathlib import Path
 
 import numpy as np
+from stable_baselines3 import PPO
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
-# model = PPO.load('apps/models/ma_quadx_chaser_20240104-195408/ma_quadx_chaser-11682368.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_17750000.zip')
 from modules.utils import generate_start_pos_orn
 
 seed = None

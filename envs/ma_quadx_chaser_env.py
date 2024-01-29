@@ -149,7 +149,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             self._observation_space = spaces.Box(
                 low=-np.inf,
                 high=np.inf,
-                shape=(self.combined_space.shape[0] + 3,),
+                shape=(self.combined_space.shape[0] + 8,),
                 dtype=np.float64,
             )
         elif self.observation_type == 2:

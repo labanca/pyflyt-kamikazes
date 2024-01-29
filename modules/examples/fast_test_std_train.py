@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_12750000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_17750000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
