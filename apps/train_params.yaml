@@ -3,10 +3,11 @@ spawn_settings: &spawn_settings
   lw_spawn_radius: 2.0
   lm_center_bounds: 5.0
   lm_spawn_radius: 5.0
-  min_z: None
+  min_z: 1.0
   seed: &seed null
-  num_lw: &num_lw 1
-  num_lm: &num_lm 1
+  num_lm: &num_lm 2
+  num_lw: &num_lw 2
+
 
 env_kwargs:
   start_pos:
@@ -34,20 +35,20 @@ env_kwargs:
   num_lw: *num_lw
   agent_hz: 30
   max_duration_seconds: 10
-  lw_stand_still: true
+  lw_stand_still: false
   lw_moves_random: false
   lw_chases: false
   lw_attacks: false
-  lw_threat_radius: 4.0
-  lw_shoot_range: 1.0
+  lw_threat_radius: 5.0
+  lw_shoot_range: 1.5
   lethal_angle: 0.15
   lethal_distance: 3.0
-  max_velocity_magnitude: 10.0
+  max_velocity_magnitude: 15.0
   thrust_limit: 0.8
   explosion_radius: 0.5
-  reward_type: 3
-  observation_type: 2
-  rew_exploding_target: 200.0
+  reward_type: 4
+  observation_type: 1
+  rew_exploding_target: 100.0
   distance_factor: 3.0
   proximity_factor: 0.1
   speed_factor: 0.1
@@ -61,4 +62,4 @@ train_kwargs:
   nn_t:
     - 256
     - 256
-  num_vec_envs: 8
+  num_vec_envs: 12

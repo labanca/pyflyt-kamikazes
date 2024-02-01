@@ -10,6 +10,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from pprint import pprint
 
 import supersuit as ss
 from gymnasium.utils import EzPickle
@@ -83,8 +84,8 @@ def train_butterfly_supersuit(
 
         model = PPO.load(model_path, env=env, device=device)
 
-        new_total_timesteps = model.num_timesteps + steps
-        new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
+        new_total_timesteps = steps - model.num_timesteps%steps
+        new_model_name = f"{env.unwrapped.metadata.get('name')}-{model.num_timesteps + new_total_timesteps}"
         folder_name = os.path.join("apps\\models", model_dir)
         filename = os.path.join(folder_name, new_model_name)
         log_dir = os.path.join(folder_name, 'logs', new_model_name)
@@ -92,10 +93,10 @@ def train_butterfly_supersuit(
         new_logger = configure(log_dir, ["csv", "tensorboard"])
         model.set_logger(new_logger)
         callback = TensorboardCallback(verbose=1, save_path=folder_name,
-                                       save_freq=250_000, check_freq=500, log_dir=log_dir)
+                                       save_freq=500_000, check_freq=1000, log_dir=log_dir)
 
         print(f"Starting resume training on {model_name}")
-        model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback)
+        model.learn(total_timesteps=new_total_timesteps, reset_num_timesteps=False, callback=callback)
         model.save(filename)
 
         print(f"Model {new_model_name} has been saved.")
@@ -143,27 +144,28 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240127-193805'
+    model_dir = 'ma_quadx_chaser_20240131-161251'
     model_name = 'a'
 
-    steps = 10_000_000
-    num_resumes = 1
+    steps = 6_000_000
+    num_resumes = 4
     reset_model = False
 
     for i in range(num_resumes):
+
+        pprint(f'{env_kwargs["spawn_settings"]["num_lm"]=}')
+        pprint(f'{env_kwargs["spawn_settings"]["num_lw"]=}')
+        pprint(f'{env_kwargs["lw_stand_still"]=}')
+        pprint(f'{env_kwargs["lw_moves_random"]=}')
 
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,
             model_name=model_name, model_dir=model_dir,
             env_kwargs=env_kwargs, train_kwargs=train_kwargs)
 
-        save_dicts_to_yaml(spawn_settings, env_kwargs, train_kwargs,
+        save_dicts_to_yaml(env_kwargs['spawn_settings'], env_kwargs, train_kwargs,
                            Path(root_dir, model_dir, f'{model_name.split(".")[0]}.yaml'))
 
-
-        env_kwargs['num_lm'] = 2
-        spawn_settings['num_lm'] = 2
-        env_kwargs['lw_stand_still'] = False
 
 
     # tensorboard --logdir C:/projects/pyflyt-kamikazes/apps/models/ma_quadx_chaser_20240104-161545/tensorboard/

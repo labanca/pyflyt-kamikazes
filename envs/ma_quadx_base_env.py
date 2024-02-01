@@ -9,6 +9,7 @@ import pybullet as p
 from PyFlyt.core import Aviary
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
+from scipy.optimize import linear_sum_assignment
 
 from modules.lwsfm import LWManager
 from modules.utils import *
@@ -56,6 +57,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             explosion_radius: float = 0.5,
             thrust_limit: float = 10.0,
             angular_rate_limit: float = np.pi,
+            direct_control: bool = False,
     ):
         """__init__.
 
@@ -95,6 +97,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         # action space flight_mode 6: vx, vy, vr, vz
         self.thrust_limit = thrust_limit
         self.angular_rate_limit = angular_rate_limit
+        self.direct_control = direct_control
 
         self.action_bounds = 1
 
@@ -145,6 +148,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.flight_dome_size = flight_dome_size
         self.max_steps = int(agent_hz * max_duration_seconds)
+        self.max_duration_seconds = max_duration_seconds
         self.env_step_ratio = int(120 / agent_hz)
         if angle_representation == "euler":
             self.angle_representation = 0
@@ -153,6 +157,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.seed = seed
         self.rewards_data = []
         self.obs_data = []
+        self.ep_data = {}
 
         """TRAINING PARAMETERS"""
         self.start_pos = start_pos
@@ -177,6 +182,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.reward_type = reward_type
         self.observation_type = observation_type
         self.explosion_radius = explosion_radius
+        self.max_achieved_speed = 0
+        self.max_achieved_rel_speed = 0
 
         """ PETTINGZOO """
         self.num_drones = len(start_pos)
@@ -283,8 +290,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.current_inf = {k: dict() for k in self.agents}
         self.current_obs = {k: [] for k in self.agents}
         self.info_counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0,
-                              'exploded_by_ally': 0,
-                              'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
+                              'exploded_by_ally': 0, 'survived': 0, 'ally_collision': 0, 'downed': 0,
+                              'is_success': 0, 'mission_complete': 0}
+        self.max_achieved_speed = 0
+        self.max_achieved_rel_speed = 0
 
         self.rew_closing_distance = np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rew_close_to_target = np.zeros((self.num_possible_agents), dtype=np.float64)
@@ -293,7 +302,12 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.rew_near_engagement = np.zeros((self.num_possible_agents), dtype=np.float64)
         self.rewards = np.zeros((self.num_possible_agents,), dtype=np.float64)
 
-        self.current_target_id = np.zeros((self.num_possible_agents,), dtype=np.int32)
+        self.acc_rew_closing_distance = np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.acc_rew_close_to_target = np.zeros((self.num_possible_agents), dtype=np.float64)
+        self.acc_rew_speed_magnitude = np.zeros((self.num_possible_agents), dtype=np.float64)
+
+
+        self.current_target_ids = np.array([-1] * self.num_possible_agents, dtype=np.int32)
         self.drone_list = self.agents + self.targets
         self.num_drones = len(self.drone_list)
         self.uav_mapping = np.array(['lm'] * self.num_lm + ['lw'] * (len(self.start_pos) - self.num_lm))
@@ -312,8 +326,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.approaching = np.zeros((self.num_drones, self.num_drones), dtype=bool)
         self.hit_probability = np.zeros((self.num_drones, self.num_drones), dtype=bool)
 
-        self.previous_magnitude = np.zeros(self.num_drones, dtype=np.float64)
-        self.current_magnitude = np.zeros(self.num_drones, dtype=np.float64)
+        self.previous_vel_magnitude = np.zeros(self.num_drones, dtype=np.float64)
+        self.current_vel_magnitude = np.zeros(self.num_drones, dtype=np.float64)
 
         self.previous_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.current_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
@@ -345,6 +359,15 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.desired_vel = np.array([0, 0, 0, 0])
 
+        if not self.direct_control:
+            drone_options = [{'drone_model': 'cf2x'} if self.uav_mapping[i] == 'lm'
+                             else {'drone_model': 'custom_cf2x'}
+                             for i in range(len(self.uav_mapping))]
+        else:
+            drone_options = [{'drone_model': 'custom_cf2x'} if self.uav_mapping[i] == 'lm'
+                             else {'drone_model': 'custom_cf2x'}
+                             for i in range(len(self.uav_mapping))]
+
         # rebuild the environment
         self.aviary = Aviary(
             start_pos=self.start_pos,
@@ -374,7 +397,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.aviary.register_all_new_bodies()
 
         # set flight mode
-        flight_modes = [0 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
+        if not self.direct_control:
+            flight_modes = [0 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
+        else:
+            flight_modes = [7 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
 
         self.aviary.set_mode(flight_modes)
 
@@ -390,26 +416,19 @@ class MAQuadXBaseEnv(ParallelEnv):
                                     )
 
         if self.render_mode:
-            self.aviary.resetDebugVisualizerCamera(cameraDistance=0.1, cameraYaw=0, cameraPitch=0,
+            self.aviary.resetDebugVisualizerCamera(cameraDistance=1.0, cameraYaw=0, cameraPitch=0,
                                                    cameraTargetPosition=self.formation_center)
             self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
 
-        for id, uav in self.armed_uavs.items():
-            if self.get_drone_type_by_id(id) == 'lw' and self.lw_moves_random:
-                random_setpoint = np.random.uniform(-self.flight_dome_size/np.sqrt(3),self.flight_dome_size/np.sqrt(3), 4)
-                random_setpoint[2] = 0
-                random_setpoint[3] = max(np.random.uniform(self.flight_dome_size/np.sqrt(3)), 0.5)
-                self.aviary.set_setpoint(id, random_setpoint )
+        if self.lw_moves_random:
+            for id, uav in self.armed_uavs.items():
+                if self.get_drone_type_by_id(id) == 'lw' :
+                    random_setpoint = np.random.uniform(-self.flight_dome_size/np.sqrt(3),self.flight_dome_size/np.sqrt(3), 4)
+                    random_setpoint[2] = 0
+                    random_setpoint[3] = max(np.random.uniform(self.flight_dome_size/np.sqrt(3)), 0.5)
+                    self.aviary.set_setpoint(id, random_setpoint )
 
-
-        # max reward value
-        # self.max_reward = (
-        #         self.max_steps * (1/0.09)
-        #         * self.proximity_factor
-        #         + 2 * self.flight_dome_size * self.distance_factor
-        #         + self.env_step_ratio * 100
-        # )
-        # self.action_scaling = np.array([self.thrust_limit, self.thrust_limit, np.pi, self.thrust_limit])
+        #self.update_targets()
 
         # wait for env to stabilize
         for _ in range(10):
@@ -418,6 +437,17 @@ class MAQuadXBaseEnv(ParallelEnv):
     def compute_auxiliary_by_id(self, agent_id: int):
         """This returns the auxiliary state form the drone."""
         return self.aviary.aux_state(agent_id)
+
+    def update_targets(self):
+
+
+        for agent in self.agents:
+            agent_id = self.agent_name_mapping[agent]
+
+            if self.current_target_ids[agent_id] == -1:
+                self.current_target_ids[agent_id] = np.argmin(np.where(self.current_distance[agent_id] != 0,
+                                                                       self.current_distance[agent_id], -1))
+
 
     def compute_attitude_by_id(
             self, agent_id: int
@@ -476,18 +506,21 @@ class MAQuadXBaseEnv(ParallelEnv):
         if self.step_count > self.max_steps:
             trunc |= True
             info["timeover"] = True
+            self.info_counters["timeover"] += 1
 
         # collision with ground
         if np.any(self.aviary.contact_array[self.aviary.drones[agent_id].Id][0]):
             reward -= 100.0
             info["crashes"] = True
             term |= True
+            self.info_counters["crashes"] += 1
 
         # exceed flight dome
         if np.linalg.norm(self.aviary.state(agent_id)[-1]) > self.flight_dome_size:
             reward -= 100.0
             info["out_of_bounds"] = True
             term |= True
+            self.info_counters["out_of_bounds"] += 1
 
         # collide with other kamikaze
         colissions = self.get_friendlyfire_type_collision(agent_id)
@@ -495,26 +528,33 @@ class MAQuadXBaseEnv(ParallelEnv):
             reward -= 100.0
             info["ally_collision"] = True
             term |= True
+            self.info_counters["ally_collision"] += 1
 
         # Shoot down by a loyal wingman
         if self.lw_manager.downed_lm[agent_id]:
             reward -= 100
             term |= True
             info['downed'] = True
+            self.info_counters["downed"] += 1
 
         # destroy any loyal wingman
         explosion_mapping = self.get_explosion_mapping(agent_id)
         if 'lw' in explosion_mapping.values():
+            num_lw_exploded = sum(np.array(list(explosion_mapping.values())) == 'lw')
             reward += self.rew_exploding_target
-            info["exploded_target"] = True
+            info["exploded_target"] = num_lw_exploded
             info["is_success"] = True
             term |= True
+            self.info_counters["exploded_target"] += 1
+            self.info_counters["is_success"] += 1
 
         elif self.get_collateral_explosions(agent_id):
             reward -= 100
             if not info.get("exploded_target", False):  # avoid misscounting when exploded the same target
                 info["exploded_by_ally"] = True
+                self.info_counters["exploded_by_ally"] += 1
             term |= True
+
 
         return term, trunc, reward, info
 
@@ -555,10 +595,17 @@ class MAQuadXBaseEnv(ParallelEnv):
         # set the new actions and send to aviary
         self.current_actions *= 0.0
 
+
+
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
-                self.current_actions[id] = actions[uav]  # rescale actions
-                self.aviary.set_setpoint(id, self.current_actions[id])  # denormalize actions
+                if not self.direct_control:
+                    self.current_actions[id] = actions[uav]  # rescale actions
+                    self.aviary.set_setpoint(id, self.current_actions[id])  # denormalize actions
+                else:
+                    target_id = self.find_nearest_lw(id) # retão
+                    self.current_actions[id] = np.insert(self.drone_positions[target_id], 2, 0)
+                    self.aviary.set_setpoint(id, self.current_actions[id])
 
         # observation and rewards dictionary
         observations = dict()
@@ -593,7 +640,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                 # compute observations
                 observations[ag] = self.compute_observation_by_id(ag_id)
 
-                if self.targets == [] and term == True:
+                if self.targets == [] and (term == True):
                     infos[ag] = {**infos[ag], 'is_success': True}
 
                 self.current_term[ag] = term
@@ -609,6 +656,8 @@ class MAQuadXBaseEnv(ParallelEnv):
                 self.compute_collisions(agent)
                 if terminations[agent]:
                     self.disarm_drone(self.agent_name_mapping[agent])
+                    #self.summarize_infos()
+
 
             # increment step count and cull dead agents for the next round
 
@@ -635,23 +684,35 @@ class MAQuadXBaseEnv(ParallelEnv):
                 key: {'is_success': True, **infos[key]} if infos[key].keys() == {'survived'} else infos[key] for key in
                 infos.keys()}
 
-            self.sumarize_infos()
+            for agent in self.agents:
+                self.info_counters['survived'] +=1
+                self.info_counters['is_success'] += 1
+
+            #self.summarize_infos()
+            self.info_counters['mission_complete'] = 1
+            self.create_dict_ep_data()
+
             return observations, rewards, terminations, truncations, infos
 
         elif self.agents == []:
-            self.sumarize_infos()
+            #self.summarize_infos()
+            self.create_dict_ep_data()
             return observations, rewards, terminations, truncations, infos
+
+        elif all(truncations.values()):
+            #self.summarize_infos()
+            self.create_dict_ep_data()
 
         return observations, rewards, terminations, truncations, infos
 
     # ------------------------------ Env End ----------------------------------------------------
 
-    def sumarize_infos(self):
+    def summarize_infos(self):
 
         for agent_key, agent_data in self.current_inf.items():
             for key, value in agent_data.items():
                 if key in self.info_counters:
-                    self.info_counters[key] += 1
+                    self.info_counters[key] += value
 
     def normalize_action(self, action: np.ndarray):
         """
@@ -932,70 +993,10 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.target_vel_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 1, 0], lineWidth=2)
         self.agent_traj_line = self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[0, 1, 0], lineWidth=2)
 
-    def decode_observation(self, obs) -> dict:
-
-        ang_vel = obs[:3]
-        quaternion = obs[3:7]
-        lin_vel = obs[7:10]
-        lin_pos = obs[10:13]
-        aux_state = obs[13:17]
-        past_actions = obs[17:21]
-        vel_magnitude = obs[21]
-        ally_lin_vel = obs[22:25]
-        ally_lin_pos = obs[25:28]
-        ang_vel_target = obs[28:31]
-        quaternion_target = obs[31:35]
-        lin_vel_target = obs[35:38]
-        lin_pos_target = obs[38:41]
-        target_last_shot_time = obs[41]
-
-        return {
-            "ang_vel": ang_vel,
-            "quaternion": quaternion,
-            "lin_vel": lin_vel,
-            "lin_pos": lin_pos,
-            "aux_state": aux_state,
-            "past_actions": past_actions,
-            'vel_magnitude': vel_magnitude,
-            "ally_lin_vel": ally_lin_vel,
-            "ally_lin_pos": ally_lin_pos,
-            "ang_vel_target": ang_vel_target,
-            "quaternion_target": quaternion_target,
-            "lin_vel_target": lin_vel_target,
-            "lin_pos_target": lin_pos_target,
-            "target_last_shot_time": target_last_shot_time,
-        }
-
-    def print_obs_variables(self, obs):
-        ang_vel = obs[:3]
-        quaternion = obs[3:7]
-        lin_vel = obs[7:10]
-        lin_pos = obs[10:13]
-        aux_state = obs[13:17]
-        past_actions = obs[17:21]
-        ally_lin_vel = obs[21:24]
-        ally_lin_pos = obs[24:27]
-        ang_vel_target = obs[27:30]
-        quaternion_target = obs[30:34]
-        lin_vel_target = obs[34:37]
-        lin_pos_target = obs[37:40]
-
-        print(f"ang_vel: {ang_vel}")
-        print(f"quaternion: {quaternion}")
-        print(f"lin_vel: {lin_vel}")
-        print(f"lin_pos: {lin_pos}")
-        print(f"aux_state: {aux_state}")
-        print(f"past_actions: {past_actions}")
-        print(f"ally_lin_vel: {ally_lin_vel}")
-        print(f"ally_lin_pos: {ally_lin_pos}")
-        print(f"ang_vel_target: {ang_vel_target}")
-        print(f"quaternion_target: {quaternion_target}")
-        print(f"lin_vel_target: {lin_vel_target}")
-        print(f"lin_pos_target: {lin_pos_target}")
 
     def append_step_data(self, agent):
         agent_id = self.agent_name_mapping[agent]
-        target_id = self.current_target_id[agent_id]
+        target_id = self.current_target_ids[agent_id]
         step_data = {
             "aviary_steps": self.aviary.aviary_steps,
             "physics_steps": self.aviary.physics_steps,
@@ -1028,6 +1029,66 @@ class MAQuadXBaseEnv(ParallelEnv):
         }
         self.rewards_data.append(step_data)
 
+    def create_dict_ep_data(self):
+
+        self.ep_data = {
+            'episode': 0,
+            "aviary_steps": self.aviary.aviary_steps,
+            "physics_steps": self.aviary.physics_steps,
+            'step_count': self.step_count,
+            "elapsed_time": self.aviary.elapsed_time,
+            "agents_acc_distance_rewards": self.acc_rew_closing_distance.sum(),
+            "agents_acc_proximity_rewards": self.acc_rew_close_to_target.sum(),
+            "agents_acc_speed_rewards": self.acc_rew_speed_magnitude.sum(),
+
+            "agents_mean_distance_rewards": self.acc_rew_closing_distance.mean(),
+            "agents_mean_proximity_rewards": self.acc_rew_close_to_target.mean(),
+            "agents_mean_speed_rewards": self.acc_rew_speed_magnitude.mean(),
+            "agents_mean_acc_rewards": sum(self.current_acc_rew.values())/len(self.current_acc_rew),
+            "agents_total_acc_rewards": sum(self.current_acc_rew.values()),
+
+            "max_achieved_speed": self.max_achieved_speed,
+            "max_achieved_rel_speed": self.max_achieved_rel_speed,
+            'num_lm': self.num_lm,
+            'num_lw': self.num_lw,
+            'out_of_bounds': self.info_counters['out_of_bounds'],
+            'crashes': self.info_counters['crashes'],
+            'timeover': self.info_counters['timeover'],
+            'exploded_target': self.info_counters['exploded_target'],
+            'mission_complete': self.info_counters['mission_complete'],
+            'ally_collision': self.info_counters['ally_collision'],
+            'exploded_by_ally': self.info_counters['exploded_by_ally'],
+            'downed': self.info_counters['downed'],
+            'is_success': self.info_counters['is_success'],
+            'survived': self.info_counters['survived'],
+            'flight_dome_size': self.flight_dome_size,
+            'explosion_radius': self.explosion_radius,
+            'max_duration_seconds': self.max_duration_seconds,
+            'distance_factor': self.distance_factor,
+            'speed_factor': self.speed_factor,
+            'proximity_factor': self.proximity_factor,
+            'rew_exploding_target': self.rew_exploding_target,
+            'reward_type': self.reward_type,
+            'observation_type': self.observation_type,
+            'max_velocity_magnitude': self.max_velocity_magnitude,
+            'lethal_angle': self.lethal_angle,
+            'lethal_distance': self.lethal_distance,
+            'lw_stand_still': self.lw_stand_still,
+            'lw_attacks': self.lw_attacks,
+            'lw_chases': self.lw_chases,
+            'lw_moves_random': self.lw_moves_random,
+            'lw_threat_radius': self.lw_threat_radius,
+            'lw_shoot_range': self.lw_shoot_range,
+            'lm_center_bounds': self.spawn_settings['lm_center_bounds'],
+            'lm_spawn_radius': self.spawn_settings['lm_spawn_radius'],
+            'lw_center_bounds': self.spawn_settings['lw_center_bounds'],
+            'lw_spawn_radius': self.spawn_settings['lw_spawn_radius'],
+            'min_z': self.spawn_settings['min_z'],
+
+        }
+
+
+
     def append_obs_data(self, agent):
 
         self.obs_data.append(self.observation_dict)
@@ -1055,3 +1116,15 @@ class MAQuadXBaseEnv(ParallelEnv):
                 return "%3.1f %s%s" % (num, unit, suffix)
             num /= 1024.0
         return "%.1f %s%s" % (num, 'Yi', suffix)
+
+
+    def direct_control_action(self, agent_id):
+
+        target_id = self.current_target_ids[agent_id]
+
+        agent_ang_pos = self.attitudes[agent_id][2]
+        target_ang_pos = self.attitudes[target_id][2]
+
+        separation_direction = (agent_ang_pos - target_ang_pos)
+
+        return [*separation_direction, 0.8]

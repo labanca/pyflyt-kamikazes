@@ -34,6 +34,20 @@ def save_dict_to_csv(data, csv_file):
         writer.writerow(data)
 
 
+def append_dict_to_csv(data, csv_file):
+    fieldnames = data.keys()
+    file_exists = csv_file.is_file() and csv_file.stat().st_size > 0  # Check if file exists and is not empty
+
+    with open(csv_file, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+
+        if not file_exists:
+            writer.writeheader()
+
+        # Write the data
+        writer.writerow(data)
+
 def read_yaml_file(file_path):
     with open(file_path, 'r') as file:
         data = yaml.safe_load(file)
@@ -46,7 +60,7 @@ def read_yaml_file(file_path):
             data['spawn_settings']['lm_spawn_radius'] +
             data['spawn_settings']['lw_center_bounds'] +
             data['spawn_settings']['lm_center_bounds']
-    )
+    ) * 1.5
 
     return data.get('spawn_settings', {}), data.get('env_kwargs', {}), data.get('train_kwargs', {})
 
@@ -106,13 +120,18 @@ def generate_random_coordinates(seed=None, lw_formation_center=[0,0,1], lw_cente
     # Generate random coordinates within the specified spawn radius and above the minimum z
     lm_coordinates = []
     while len(lm_coordinates) < num_lm:
-        x = np.random.uniform(low=lm_spawn_center[0] - lm_spawn_radius, high=lm_spawn_center[0] + lm_spawn_radius)
-        y = np.random.uniform(low=lm_spawn_center[1] - lm_spawn_radius, high=lm_spawn_center[1] + lm_spawn_radius)
-        z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
+        x = np.random.uniform(low= - (lm_spawn_radius + lw_center_bounds), high=lm_spawn_radius + lw_center_bounds)
+        y = np.random.uniform(low=- (lm_spawn_radius + lw_center_bounds), high= lm_spawn_radius + lw_center_bounds)
+        z = np.random.uniform(low=min_z, high=lm_spawn_radius + lw_center_bounds)
+
+        # x = np.random.uniform(low=lm_spawn_center[0] - lm_spawn_radius, high=lm_spawn_center[0] + lm_spawn_radius)
+        # y = np.random.uniform(low=lm_spawn_center[1] - lm_spawn_radius, high=lm_spawn_center[1] + lm_spawn_radius)
+        # z = np.random.uniform(low=min_z, high=lm_spawn_center[2] + lm_spawn_radius)
 
         # Check if the generated coordinates are outside the exclusion area of the lw formation
         lm_distance = np.linalg.norm(lw_formation_center[:2] - np.array([x, y]))
-        if lm_distance > 0.6:
+
+        if lm_distance > (2 * lw_spawn_radius):
             lm_coordinates.append([x, y, z])
 
     return np.array(lm_coordinates)

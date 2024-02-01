@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -85,6 +87,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             explosion_radius: float = 0.5,
             thrust_limit: float = 1.0,
             angular_rate_limit: float = np.pi,
+            direct_control:  bool = False,
     ):
         """__init__.
 
@@ -130,6 +133,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             explosion_radius=explosion_radius,
             thrust_limit=thrust_limit,
             angular_rate_limit=angular_rate_limit,
+            direct_control=direct_control,
 
         )
 
@@ -149,7 +153,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             self._observation_space = spaces.Box(
                 low=-np.inf,
                 high=np.inf,
-                shape=(self.combined_space.shape[0] + 8,),
+                shape=(self.combined_space.shape[0] + 9,),
                 dtype=np.float64,
             )
         elif self.observation_type == 2:
@@ -225,7 +229,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # relative ground relative velocities and ground relative magnitude
         self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
-        #self.current_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
+        self.current_vel_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
 
         # angles between the ground velocity and separation
@@ -294,6 +298,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             ally_delta_ang_pos = np.array([-3, -3, -3])
             ally_delta_lin_vel = np.array([-3, -3, -3])
             ally_distance = np.random.uniform(-30) #False
+            #ally_lin_pos = np.array([-3, -3, -3])
+
         else:
             ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
             #ally_ang_vel = ally_ang_vel  # unchanged
@@ -313,7 +319,11 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         else:
             hit_probability = 0.001
 
-        current_action = np.array(self.current_actions[agent_id])
+        if self.max_achieved_speed < self.current_vel_magnitude[agent_id]:
+            self.max_achieved_speed = self.current_vel_magnitude[agent_id]
+
+        if self.max_achieved_rel_speed < self.current_rel_vel_magnitude[agent_id][target_id]:
+            self.max_achieved_rel_speed = self.current_rel_vel_magnitude[agent_id][target_id]
 
         if self.save_step_data:
             self.observation_dict = dict(
@@ -361,9 +371,11 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                     *agent_aux_state,
                     *target_delta_lin_pos,
                     target_distance,
+                    hit_probability,
                     0 if near_ally_id == -1 else 1,
-                    *ally_lin_pos,
+                    *ally_delta_lin_pos,
                     ally_distance,
+
                 ]
             )
 
@@ -410,7 +422,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         # reset rewards
         self.rewards[agent_id] *= 0.0
         target_id = self.find_nearest_lw(agent_id)
-        self.current_target_id[agent_id] = target_id  # stores targets
+        self.current_target_ids[agent_id] = target_id  # stores targets
 
         if target_id == agent_id:
             self.rewards[agent_id] = 0
@@ -519,6 +531,10 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         self.rew_close_to_target[agent_id] *= self.proximity_factor
         self.rew_speed_magnitude[agent_id] *= self.speed_factor
 
+        self.acc_rew_closing_distance[agent_id] += self.rew_closing_distance[agent_id]
+        self.acc_rew_close_to_target[agent_id] += self.rew_close_to_target[agent_id]
+        self.acc_rew_speed_magnitude[agent_id] += self.rew_speed_magnitude[agent_id]
+
         self.rewards[agent_id] += (
                 self.rew_closing_distance[agent_id]
                 + self.rew_close_to_target[agent_id]
@@ -562,6 +578,26 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # order of operations for multiplication matters here
         return rz @ ry @ rx, forward_vector
+
+    def write_eval_data(self, data, filename):
+        # write the rewards data to a file
+        import csv
+
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filename, 'w', newline='') as csvfile:
+
+            fieldnames =  list(data[0].keys())
+
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
+
+            # Write the data
+            for step_data in data:
+                writer.writerow(step_data)
+
 
     def write_step_data(self, filename):
         # write the rewards data to a file
@@ -609,6 +645,26 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             # Write the data
             for obs_data in self.obs_data:
                 writer.writerow(obs_data)
+
+
+
+    def save_ep_data(self, filename):
+
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = ['ep_number', 'ep_duration', 'num_lm', 'num_lw', 'out_of_bounds', 'crashes', 'timeover',
+                          'exploded_target', 'mission_complete', 'ally_collision', 'exploded_by_ally', 'downed',
+                          'is_success', 'flight_dome_size', 'explosion_radius', 'max_duration_seconds',
+                          'distance_factor', 'speed_factor', 'proximity_factor', 'rew_exploding_target',
+                          'reward_type', 'observation_type', 'max_velocity_magnitude', 'lethal_angle', 'lethal_distance',
+                          'lw_stand_still', 'lw_attacks', 'lw_chases', 'lw_moves_random', 'lw_threat_radius',
+                          'lw_shoot_range', 'lm_center_bounds', 'lm_spawn_radius', 'lw_center_bounds', 'lw_spawn_radius',
+                          'min_z', 'num_lm', 'num_lw', 'seed']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write the header
+            writer.writeheader()
 
     def plot_rewards_data(self, filename):
         import pandas as pd

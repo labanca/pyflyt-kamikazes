@@ -5,8 +5,8 @@ spawn_settings: &spawn_settings
   lm_spawn_radius: 5.0
   min_z: 1
   seed: null
-  num_lw: &num_lw 5
-  num_lm: &num_lm 5
+  num_lw: &num_lw 1
+  num_lm: &num_lm 1
 
 env_kwargs:
   start_pos:
@@ -45,13 +45,14 @@ env_kwargs:
   max_velocity_magnitude: 10.0
   thrust_limit: 0.8
   explosion_radius: 0.5
-  reward_type: 3
-  observation_type: 0
+  reward_type: 4
+  observation_type: 1
   rew_exploding_target: 200.0
   distance_factor: 3.0
   proximity_factor: 0.1
   speed_factor: 0.1
   save_step_data: false
+  direct_control: false
 
 train_kwargs:
   device: cuda

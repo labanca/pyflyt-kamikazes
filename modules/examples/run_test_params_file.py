@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240127-193805/saved_models/model_17750000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240131-161251/ma_quadx_chaser-24000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -48,6 +48,8 @@ while env.agents:
 
     observations, rewards, terminations, truncations, infos = env.step(actions)
 
+
+
     if first_time == True:
         first_time = False
 
@@ -69,12 +71,13 @@ while env.agents:
         # env.plot_rewards_data('reward_data.csv')
         # env.plot_agent_rewards('reward_data.csv', 0)
         # env.plot_agent_infos2('reward_data.csv', 0)
+        print(env.info_counters)
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')
 
     if num_games == 0:
-        print(counters)
+
         print(f'{i=}')
         break
 

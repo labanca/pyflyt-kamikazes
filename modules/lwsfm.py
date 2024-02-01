@@ -126,8 +126,10 @@ class LWManager:
     def update(self, stand_still=False):
 
         for lwfsw in self.squad:
+
             if not stand_still and not self.env.lw_moves_random:
-                lwfsw.update()
+                if lwfsw.id in self.env.armed_uavs.keys():
+                    lwfsw.update()
 
     def get_squad_setpoints(self):
         """
@@ -166,7 +168,7 @@ class LWFSM:
         self.current_threat_id = None
         # self.current_threat_pos = None
         self.id = lw_id
-        self.thread_radius = threat_radius
+        self.threat_radius = threat_radius
         self.shoot_range = shoot_range
         self.manager = manager
         self.states = {
@@ -218,7 +220,7 @@ class LWFSM:
         if nearest_threat is None:
             return False
 
-        if self.manager.env.current_distance[self.id][nearest_threat] < self.thread_radius:
+        if self.manager.env.current_distance[self.id][nearest_threat] < self.threat_radius:
 
             self.current_threat_id = nearest_threat
             # self.current_threat_pos = self.manager.env.drone_positions[nearest_threat]
