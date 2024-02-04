@@ -287,6 +287,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_id = self.find_nearest_lw(agent_id)
         near_ally_id = self.find_nearest_lm(agent_id, exclude_self=True)
 
+
         # states
         agent_state = self.compute_attitude_by_id(agent_id)
         agent_aux_state = self.compute_auxiliary_by_id(agent_id)
@@ -309,8 +310,8 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_delta_lin_vel = np.matmul((target_lin_vel - lin_vel), agent_rotation)
         target_distance = float(np.linalg.norm(target_delta_lin_pos))
 
-        if near_ally_id == -1:
-            ally_delta_ang_vel = np.array([-3, -13, -13])
+        if (near_ally_id == -1) or (self.current_distance[agent_id][near_ally_id] >= 1.0):
+            ally_delta_ang_vel = np.array([-3, -3, -3])
             ally_delta_ang_pos = np.array([-3, -3, -3])
             ally_delta_lin_pos = np.array([-3, -3, -3])
             ally_delta_lin_vel = np.array([-3, -3, -3])

@@ -3,7 +3,7 @@ from stable_baselines3 import PPO
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.utils import *
 
-model_path = Path('apps/models/ma_quadx_chaser_20240203-193450/saved_models/model_4500000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240204-120343/ma_quadx_chaser-10000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 

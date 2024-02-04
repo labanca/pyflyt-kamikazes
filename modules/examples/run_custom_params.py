@@ -5,7 +5,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
-model = PPO.load('apps/models/ma_quadx_chaser_20240131-015320/saved_models/model_12500000.zip')
+model = PPO.load('apps/models/ma_quadx_chaser_20240202-014543/ma_quadx_chaser-30000000.zip')
 from modules.utils import generate_start_pos_orn
 
 seed = None

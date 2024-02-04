@@ -144,7 +144,7 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240128-221717'
+    model_dir = 'ma_quadx_chaser_20240204-023751'
     model_name = 'a'
 
     steps = 10_000_000
@@ -157,6 +157,7 @@ if __name__ == "__main__":
             steps = 10_000_000
             env_kwargs['reward_type'] = 5 # hit prob in penalty
             env_kwargs['observation_type'] = 3 # hit prob in obs
+            model_name = 'a'
             #train_kwargs['num_vec_envs'] = 2
             #env_kwargs["lw_stand_still"] = False
             #env_kwargs["lw_moves_random"] = False

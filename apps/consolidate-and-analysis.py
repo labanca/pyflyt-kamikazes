@@ -16,7 +16,7 @@ def append_csvs(experiment_name, model_name, base_path="/app/models", eval_mode=
     DataFrame: A concatenated DataFrame containing all episodes data.
     """
     # Construct the path pattern for the CSV files
-    path_pattern = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/rl*.csv"
+    path_pattern = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/{eval_mode}_sc*_*x*.csv"
 
     # Use glob to match all csv files following the pattern
     all_files = glob.glob(path_pattern)
@@ -79,6 +79,13 @@ def calculate_metrics(input_file_path, output_file_path):
                   )
         )
 
+    def calc_total_rate(group):
+        return (
+            calc_explosion_rate(group) +
+            calc_survival_rate(group) +
+            calc_casualty_rate(group) +
+            calc_timeover_rate(group)
+        )
     def calc_mean_total_reward(group):
         return group['agents_total_acc_rewards'].mean()
 
@@ -103,20 +110,34 @@ def calculate_metrics(input_file_path, output_file_path):
     def calc_mean_lm_timeovers(group):
         return group['timeover'].mean()
 
-    def calc_mean_time_to_timeout(group):
+    def calc_mean_time_to_complete(group):
         return group[group['mission_complete'] == True]['elapsed_time'].mean()
 
 
     # Apply calculations for each scenario
     ep_performance_metric = df.groupby('scenario').apply(lambda group: pd.Series({
         'win_rate': calc_win_rate(group),
-        'explosion_rate': round(calc_explosion_rate(group), 2),
-        'survive_rate': round(calc_survival_rate(group), 2),
-        'casualty_rate': round(calc_casualty_rate(group), 2),
-        'time_overs_rate': round(calc_timeover_rate(group), 2),
+        'explosion_rate': calc_explosion_rate(group),
+        'survival_rate': calc_survival_rate(group),
+        'casualty_rate': calc_casualty_rate(group),
+        'time_overs_rate': calc_timeover_rate(group),
+        #'total': calc_total_rate(group),
+        'mean_time_to_complete': calc_mean_time_to_complete(group),
 
 
     })).reset_index()
+
+    # Apply calculations for all data
+    overall_performance_metrics = pd.DataFrame([{
+        'scenario': f'All {eval_mode} scenarios',
+        'win_rate': calc_win_rate(df),
+        'explosion_rate': calc_explosion_rate(df),
+        'survival_rate': calc_survival_rate(df),
+        'casualty_rate': calc_casualty_rate(df),
+        'time_overs_rate': calc_timeover_rate(df),
+        #'total': calc_total_rate(df),,
+        'mean_time_to_complete': calc_mean_time_to_complete(df),
+    }])
 
     ep_combat_metrics = df.groupby('scenario').apply(lambda group: pd.Series({
         'win_rate': calc_win_rate(group),
@@ -128,21 +149,11 @@ def calculate_metrics(input_file_path, output_file_path):
         'mean_lm_exploded_per_ally': calc_mean_lm_exploded_by_ally(group),
         'mean_lm_out_of_bounds': calc_mean_lm_out_of_bounds(group),
         'mean_lm_timeovers': calc_mean_lm_timeovers(group),
-        'mean_time_to_complete': calc_mean_time_to_timeout(group),
+        'mean_time_to_complete': calc_mean_time_to_complete(group),
     })).reset_index()
 
-
-    # Apply calculations for all data
-    overall_performance_metrics = pd.DataFrame([{
-        'win_rate': calc_win_rate(df),
-        'explosion_rate': calc_explosion_rate(df),
-        'survive_rate': calc_survival_rate(df),
-        'casualty_rate': calc_casualty_rate(df),
-        'mean_time_to_complete': calc_timeover_rate(df),
-        'time_overs': calc_time_overs(df)
-    }])
-
     overall_combat_metrics = pd.DataFrame([{
+        'scenario': f'All {eval_mode} scenarios',
         'win_rate': calc_win_rate(df),
         'mean_total_reward': calc_mean_total_reward(df),
         'mean_lw_exploded': calc_mean_lw_exploded(df),
@@ -156,11 +167,11 @@ def calculate_metrics(input_file_path, output_file_path):
 
     #per = pd.DataFrame(overall_metrics, columns=overall_metrics.keys().values)
 
-    ep_performance_metric.to_csv(f"{output_file_path}/ep_performance_metric.csv", index=False)
-    ep_combat_metrics.to_csv(f"{output_file_path}/ep_combat_metrics.csv", index=False)
+    ep_performance_metric.to_csv(f"{output_file_path}/{eval_mode}-ep_performance_metric.csv", index=False)
+    ep_combat_metrics.to_csv(f"{output_file_path}/{eval_mode}-ep_combat_metrics.csv", index=False)
 
-    overall_performance_metrics.to_csv(f"{output_file_path}/overall_performance_metrics.csv", index=False)
-    overall_combat_metrics.to_csv(f"{output_file_path}/overall_combat_metrics.csv", index=False)
+    overall_performance_metrics.to_csv(f"{output_file_path}/{eval_mode}-overall_performance_metrics.csv", index=False)
+    overall_combat_metrics.to_csv(f"{output_file_path}/{eval_mode}-overall_combat_metrics.csv", index=False)
 
     # Save the metrics to a CSV file
 
@@ -170,10 +181,10 @@ def calculate_metrics(input_file_path, output_file_path):
 
 eval_mode = 'rl'
 base_path = 'apps/models'
-experiment_name = 'ma_quadx_chaser_20240131-161251'
-model_name = 'ma_quadx_chaser-24000000'
+experiment_name = 'ma_quadx_chaser_20240202-014543'
+model_name = 'ma_quadx_chaser-30000000'
 
-append_csvs(experiment_name=experiment_name, model_name=model_name, base_path=base_path, eval_mode=eval_mode)
+#append_csvs(experiment_name=experiment_name, model_name=model_name, base_path=base_path, eval_mode=eval_mode)
 
 input_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/consolidate_scenarios.csv"
 metrics_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}"
