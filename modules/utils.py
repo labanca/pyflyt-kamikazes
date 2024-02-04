@@ -55,6 +55,8 @@ def read_yaml_file(file_path):
     data['env_kwargs']['start_pos'], data['env_kwargs']['start_orn'], data['env_kwargs'][
         'formation_center'] = generate_start_pos_orn(**data['spawn_settings'])
 
+    data['env_kwargs']['start_orn'] = np.zeros_like(data['env_kwargs']['start_pos'])
+
     data['env_kwargs']['flight_dome_size'] = (
             data['spawn_settings']['lw_spawn_radius'] +
             data['spawn_settings']['lm_spawn_radius'] +

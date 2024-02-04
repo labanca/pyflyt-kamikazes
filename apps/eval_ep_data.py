@@ -5,7 +5,7 @@ from stable_baselines3 import PPO
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.utils import *
 
-def evaluate_agent(model_path, custom_params, params_path):
+def evaluate_agent(model_path, custom_params, params_path, eval_mode):
 
     model_name = model_path.stem
     model_folder = model_path.parent
@@ -14,7 +14,8 @@ def evaluate_agent(model_path, custom_params, params_path):
     if not custom_params:
         params_path = f'{model_folder}/{model_name}.yaml'
 
-    model = PPO.load(model_path)
+    if eval_mode == 'rl':
+        model = PPO.load(model_path)
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     env = MAQuadXChaserEnv(render_mode=None, **env_kwargs)
@@ -26,22 +27,28 @@ def evaluate_agent(model_path, custom_params, params_path):
     num_victories = 0
     episode_summary = []
 
-    csv_path = Path(model_folder, 'ep_data', model_name, f'episode_data-{scenario_name}.csv')
+    csv_path = Path(model_folder, 'ep_data', model_name, eval_mode, f'{scenario_name}.csv')
 
     if csv_path.is_file():
         csv_path.unlink()
 
+    print(f'{scenario_name=}')
     print(f'{env_kwargs["spawn_settings"]["num_lm"]=}')
     print(f'{env_kwargs["spawn_settings"]["num_lw"]=}')
     print(f'{env_kwargs["lw_stand_still"]=}')
     print(f'{env_kwargs["lw_moves_random"]=}')
+    print(f'{env_kwargs["direct_control"]=}')
 
     start_time = time.time()
     while env.agents:
         if elapsed_games > num_games:
             break
 
-        actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+        if eval_mode == 'rl':
+            actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
+        else:
+            actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+
         observations, rewards, terminations, truncations, infos = env.step(actions)
 
         if all(terminations.values()) or all(truncations.values()):
@@ -54,7 +61,8 @@ def evaluate_agent(model_path, custom_params, params_path):
             observations, infos = env.reset(seed=spawn_settings['seed'])
             print(f'Episodes elapsed: {elapsed_games}')
 
-
+    for dictionary in episode_summary:
+        dictionary['scenario'] = scenario_name
     env.write_eval_data(episode_summary, csv_path)
     end_time = time.time()
     print(f"Win rate: {num_victories/num_games:.2%}")
@@ -64,22 +72,20 @@ def evaluate_agent(model_path, custom_params, params_path):
 
 # -------------------------------------------------
 
-model_path = Path('apps/models/ma_quadx_chaser_20240131-161251/ma_quadx_chaser-24000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240128-221717/ma_quadx_chaser-15261776.zip')
 mode_dir = model_path.parent
+eval_mode = 'rl'
 
 custom_params = True
-num_games = 1000
-#params_path = Path('apps/models/ma_quadx_chaser_20240130-022034/ma_quadx_chaser-23063360.yaml')
+num_games = 200
 
+params_paths = glob.glob(f"{mode_dir}\\eval_scenarios\\{eval_mode}\\*.yaml")
 
-
-params_paths = glob.glob(f"{mode_dir}/eval_scenarios/*.yaml")
-#model_names = [Path(file).name for file in files_paths]
-
+#params_paths = params_paths[3:]
 
 for scenario_param in params_paths:
 
-    evaluate_agent(model_path=model_path, custom_params=custom_params, params_path=Path(scenario_param))
+    evaluate_agent(model_path=model_path, custom_params=custom_params, params_path=Path(scenario_param), eval_mode=eval_mode)
 
 
 

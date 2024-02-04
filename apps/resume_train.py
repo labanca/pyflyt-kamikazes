@@ -84,8 +84,8 @@ def train_butterfly_supersuit(
 
         model = PPO.load(model_path, env=env, device=device)
 
-        new_total_timesteps = steps - model.num_timesteps%steps
-        new_model_name = f"{env.unwrapped.metadata.get('name')}-{model.num_timesteps + new_total_timesteps}"
+        new_total_timesteps = (steps + model.num_timesteps)
+        new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
         folder_name = os.path.join("apps\\models", model_dir)
         filename = os.path.join(folder_name, new_model_name)
         log_dir = os.path.join(folder_name, 'logs', new_model_name)
@@ -96,7 +96,7 @@ def train_butterfly_supersuit(
                                        save_freq=500_000, check_freq=1000, log_dir=log_dir)
 
         print(f"Starting resume training on {model_name}")
-        model.learn(total_timesteps=new_total_timesteps, reset_num_timesteps=False, callback=callback)
+        model.learn(total_timesteps=steps, reset_num_timesteps=False, callback=callback)
         model.save(filename)
 
         print(f"Model {new_model_name} has been saved.")
@@ -144,19 +144,46 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240131-161251'
+    model_dir = 'ma_quadx_chaser_20240128-221717'
     model_name = 'a'
 
-    steps = 6_000_000
-    num_resumes = 4
+    steps = 10_000_000
+    num_resumes = 2
     reset_model = False
 
     for i in range(num_resumes):
 
+        if i == 1: # lw fsm on
+            steps = 10_000_000
+            env_kwargs['reward_type'] = 5 # hit prob in penalty
+            env_kwargs['observation_type'] = 3 # hit prob in obs
+            #train_kwargs['num_vec_envs'] = 2
+            #env_kwargs["lw_stand_still"] = False
+            #env_kwargs["lw_moves_random"] = False
+            #env_kwargs['max_velocity_magnitude'] = 20
+            #env_kwargs['speed_factor'] = 0.2
+            #env_kwargs['rew_exploding_target'] = 200
+            #env_kwargs["spawn_settings"]["num_lm"] = 10
+            #env_kwargs["spawn_settings"]["num_lw"] = 2
+            #env_kwargs["num_lm"] = 10
+            #env_kwargs["num_lw"] = 2
+
+        pprint(f'{env_kwargs["num_lm"]=}')
+        pprint(f'{env_kwargs["num_lw"]=}')
         pprint(f'{env_kwargs["spawn_settings"]["num_lm"]=}')
         pprint(f'{env_kwargs["spawn_settings"]["num_lw"]=}')
         pprint(f'{env_kwargs["lw_stand_still"]=}')
         pprint(f'{env_kwargs["lw_moves_random"]=}')
+        pprint(f'{env_kwargs["lw_shoot_range"]=}')
+        pprint(f'{env_kwargs["lw_threat_radius"]=}')
+        pprint(f'{env_kwargs["lw_weapon_cooldown"]=}')
+        pprint(f'{env_kwargs["rew_exploding_target"]=}')
+        pprint(f'{env_kwargs["distance_factor"]=}')
+        pprint(f'{env_kwargs["proximity_factor"]=}')
+        pprint(f'{env_kwargs["speed_factor"]=}')
+        pprint(f'{env_kwargs["max_velocity_magnitude"]=}')
+        pprint(f'{env_kwargs["observation_type"]=}')
+        pprint(f'{env_kwargs["reward_type"]=}')
 
         model_name, model_dir = train_butterfly_supersuit(
             env_fn=env_fn, steps=steps, train_desc=train_desc,

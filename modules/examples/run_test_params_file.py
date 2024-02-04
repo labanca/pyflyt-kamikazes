@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240131-161251/ma_quadx_chaser-24000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240203-220652/saved_models/model_8250000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -30,35 +30,29 @@ observations, infos = env.reset(seed=seed)
 last_term = {}
 counters = {'out_of_bounds': 0, 'crashes': 0, 'timeover': 0, 'exploded_target': 0, 'exploded_by_ally': 0,
             'survived': 0, 'ally_collision': 0, 'downed': 0, 'is_success': 0}
-first_time = True
 num_games = 1
 i = 1
-last_start_pos = env_kwargs['start_pos']
+max_speed = 0
+max_lin_vel = np.array([])
 while env.agents:
 
     #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     # always chase
-    #actions['agent_0'] = np.array([4, 4, 0, 0.5])  # np.array([i, i, 0, 0.123*i])env.desired_vel
+    actions['agent_0'] = np.array([4, 4, 0, 2])  # np.array([i, i, 0, 0.123*i])env.desired_vel
     # actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     # actions['agent_2'] = np.array([5, 2, 0, 0.8])
     # actions['agent_3'] = np.array([0, 0, 0, 0])
     i += 1
 
+    current_speed = np.linalg.norm(env.attitudes[0][2])
+    if current_speed > max_speed:
+        max_speed = current_speed
+        max_lin_vel = env.attitudes[0][2]
+
     observations, rewards, terminations, truncations, infos = env.step(actions)
 
-
-
-    if first_time == True:
-        first_time = False
-
-    if any(terminations.values()) or any(truncations.values()):
-
-        for agent_key, agent_data in infos.items():
-            for key, value in agent_data.items():
-                if key in counters:
-                    counters[key] += 1
 
     if all(terminations.values()) or all(truncations.values()):
         print(f'********* EPISODE END **********\n')
@@ -72,6 +66,8 @@ while env.agents:
         # env.plot_agent_rewards('reward_data.csv', 0)
         # env.plot_agent_infos2('reward_data.csv', 0)
         print(env.info_counters)
+        print(f'{max_speed=}')
+        print(f'{max_lin_vel=}')
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')

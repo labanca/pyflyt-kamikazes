@@ -58,6 +58,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             thrust_limit: float = 10.0,
             angular_rate_limit: float = np.pi,
             direct_control: bool = False,
+            lw_weapon_cooldown: float = 2.0
     ):
         """__init__.
 
@@ -176,6 +177,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.lw_attacks = lw_attacks
         self.lw_threat_radius = lw_threat_radius
         self.lw_shoot_range = lw_shoot_range
+        self.lw_weapon_cooldown = lw_weapon_cooldown
         self.rew_exploding_target = rew_exploding_target
         self.max_velocity_magnitude = max_velocity_magnitude
         self.save_step_data = save_step_data,
@@ -400,7 +402,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         if not self.direct_control:
             flight_modes = [0 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
         else:
-            flight_modes = [7 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
+            flight_modes = [6 if self.uav_mapping[i] == 'lm' else 7 for i in range(len(self.uav_mapping))]
 
         self.aviary.set_mode(flight_modes)
 
@@ -412,6 +414,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                                     formation_radius=self.spawn_settings[
                                         'lw_spawn_radius'] if self.spawn_settings is not None else 1.0,
                                     threat_radius=self.lw_threat_radius,
+                                    weapon_cooldown=self.lw_weapon_cooldown,
                                     shoot_range=self.lw_shoot_range,
                                     )
 
@@ -423,9 +426,11 @@ class MAQuadXBaseEnv(ParallelEnv):
         if self.lw_moves_random:
             for id, uav in self.armed_uavs.items():
                 if self.get_drone_type_by_id(id) == 'lw' :
-                    random_setpoint = np.random.uniform(-self.flight_dome_size/np.sqrt(3),self.flight_dome_size/np.sqrt(3), 4)
+                    random_setpoint = np.zeros(4, np.float64)
+                    random_setpoint[0] = np.random.uniform(-self.flight_dome_size/np.sqrt(3), self.flight_dome_size/np.sqrt(3))/2
+                    random_setpoint[1] = np.random.uniform(-self.flight_dome_size/np.sqrt(3), self.flight_dome_size/np.sqrt(3))/2
                     random_setpoint[2] = 0
-                    random_setpoint[3] = max(np.random.uniform(self.flight_dome_size/np.sqrt(3)), 0.5)
+                    random_setpoint[3] = np.random.uniform(2 ,self.flight_dome_size/np.sqrt(3))/2
                     self.aviary.set_setpoint(id, random_setpoint )
 
         #self.update_targets()
@@ -604,7 +609,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                     self.aviary.set_setpoint(id, self.current_actions[id])  # denormalize actions
                 else:
                     target_id = self.find_nearest_lw(id) # retão
-                    self.current_actions[id] = np.insert(self.drone_positions[target_id], 2, 0)
+                    self.current_actions[id] = self.direct_control_action(id) # np.insert(self.drone_positions[target_id], 2, 0)
                     self.aviary.set_setpoint(id, self.current_actions[id])
 
         # observation and rewards dictionary
@@ -875,7 +880,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         else:
             lm_indices = np.array([key for key, value in self.armed_uav_types.items() if value == 'lm'])
 
-        if not len(lm_indices) > 0:
+        if not (len(lm_indices) > 0):
             if self.drone_classes == 'lw':
                 return None  # for LWManager works
             else:
@@ -1120,11 +1125,21 @@ class MAQuadXBaseEnv(ParallelEnv):
 
     def direct_control_action(self, agent_id):
 
-        target_id = self.current_target_ids[agent_id]
+        target_id = self.find_nearest_lw(agent_id)
+        agent_state = self.compute_attitude_by_id(agent_id)
+        target_state = self.compute_attitude_by_id(target_id)
 
-        agent_ang_pos = self.attitudes[agent_id][2]
-        target_ang_pos = self.attitudes[target_id][2]
+        _, _, _, lin_pos, agent_quaternion = agent_state
+        _, _, _, target, target_quaternion = target_state
 
-        separation_direction = (agent_ang_pos - target_ang_pos)
+        # rotation matrix
+        rotation = np.array(self.aviary.getMatrixFromQuaternion(target_quaternion)).reshape(3, 3)
 
-        return [*separation_direction, 0.8]
+        # drone to target
+        target_deltas = target - lin_pos
+
+        velocity = ( target_deltas / np.linalg.norm(target_deltas) ) * 5.0 #  max(self.current_distance[agent_id][target_id], 5.0)
+
+        velocity = np.matmul( velocity, rotation.T)
+
+        return np.insert(velocity, 2, 0)

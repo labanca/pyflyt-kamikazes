@@ -9,18 +9,20 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240128-221717/ma_quadx_chaser-15261776.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240131-161251/ma_quadx_chaser-24000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
 
-params_path = f'{model_folder}/{model_name}.yaml'
+params_path = f'modules/examples/train_params_test.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([[10, 1, 1], [0, 0, 7]])
+start_pos = np.array([[3, 0, 1], [0, 0, 1]])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
+env_kwargs['start_orn'] = start_orn
 env_kwargs['num_lm'] = 1
+env_kwargs['num_lw'] = 1
 env_kwargs['spawn_settings'] = None
 env_kwargs['formation_center'] = np.array([0, 0, 1])
 
@@ -34,13 +36,16 @@ first_time = True
 num_games = 1
 i = 1
 last_start_pos = env_kwargs['start_pos']
+
+env.aviary.drones[0].set_mode(7)
+env.aviary.drones[1].set_mode(7)
 while env.agents:
 
     # actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
     # always chase
-    # actions['agent_0'] = env.desired_vel #  np.array([-4, -4, 0, 0.15]) # np.array([i, i, 0, 0.123*i])
+    actions['agent_0'] = np.array([6, 0, 0, 1]) # np.array([i, i, 0, 0.123*i])
     # actions['agent_1'] = np.array([-1, 0, 0, 0.8])
     # actions['agent_2'] = np.array([5, 2, 0, 0.8])
     # actions['agent_3'] = np.array([0, 0, 0, 0])
@@ -69,6 +74,7 @@ while env.agents:
         # env.plot_rewards_data('reward_data.csv')
         # env.plot_agent_rewards('reward_data.csv', 0)
         # env.plot_agent_infos2('reward_data.csv', 0)
+        print(env.info_counters)
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')

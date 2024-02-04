@@ -17,7 +17,7 @@ model_folder = model_path.parent
 params_path = f'apps/train_params.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
-start_pos = np.array([[-4, -4, 1], [0, -0.6, 1], [-7, -7, 7], [0, 0, 1], [0, 0, 1], [7, 7, 7]])
+start_pos = np.array([[-4, -4, 1], [0, -2, 1], [-7, -7, 7], [2, 0, 1], [0, 0, 1], [7, 7, 7]])
 start_orn = np.zeros_like(start_pos)
 env_kwargs['start_pos'] = start_pos
 env_kwargs['start_orn'] = start_orn

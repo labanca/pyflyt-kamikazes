@@ -70,6 +70,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             lw_attacks: bool = False,
             lw_threat_radius: float = 4.0,
             lw_shoot_range: float = 1.0,
+            lw_weapon_cooldown: float = 2.0,
             lethal_angle: float = 0.15,
             lethal_distance: float = 2.0,
             agent_hz: int = 30,
@@ -134,6 +135,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             thrust_limit=thrust_limit,
             angular_rate_limit=angular_rate_limit,
             direct_control=direct_control,
+            lw_weapon_cooldown=lw_weapon_cooldown,
 
         )
 
@@ -161,6 +163,21 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
                 low=-np.inf,
                 high=np.inf,
                 shape=(self.combined_space.shape[0] + 9,),
+                dtype=np.float64,
+            )
+        elif self.observation_type == 3:
+            self._observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(self.combined_space.shape[0] + 9,),
+                dtype=np.float64,
+            )
+
+        elif self.observation_type == 4:
+            self._observation_space = spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(self.combined_space.shape[0] + 8,),
                 dtype=np.float64,
             )
 
@@ -293,18 +310,22 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         target_distance = float(np.linalg.norm(target_delta_lin_pos))
 
         if near_ally_id == -1:
-            ally_delta_lin_pos = np.array([-3, -3, -3])
-            ally_ang_vel = np.array([-3, -3, -3])
+            ally_delta_ang_vel = np.array([-3, -13, -13])
             ally_delta_ang_pos = np.array([-3, -3, -3])
+            ally_delta_lin_pos = np.array([-3, -3, -3])
             ally_delta_lin_vel = np.array([-3, -3, -3])
-            ally_distance = np.random.uniform(-30) #False
-            #ally_lin_pos = np.array([-3, -3, -3])
+            ally_distance = -30 #False
+
+            ally_ang_vel = np.array([-3, -3, -3])
+            ally_ang_pos = np.array([-3, -3, -3])
+            ally_lin_vel = np.array([-3, -3, -3])
+            ally_lin_pos = np.array([-3, -3, -3])
 
         else:
-            ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
-            #ally_ang_vel = ally_ang_vel  # unchanged
-            ally_delta_ang_pos = ang_pos - ally_ang_pos
+            ally_delta_ang_pos = ally_ang_pos - ang_pos
+            ally_ang_vel = ally_ang_vel  # unchanged
             ally_delta_lin_vel = np.matmul((ally_lin_vel - lin_vel), agent_rotation)
+            ally_delta_lin_pos = np.matmul((ally_lin_pos - lin_pos), agent_rotation)
             ally_distance = float(np.linalg.norm(ally_delta_lin_pos))
 
         # direction and separation relative to the ground frame
@@ -397,6 +418,43 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
                 ]
             )
+        elif self.observation_type == 3: # past actions, relative
+            return np.array(
+                [
+                    *ang_vel,
+                    *ang_pos,
+                    *lin_vel,
+                    *lin_pos,
+                    *self.past_actions[agent_id],
+                    *agent_aux_state,
+                    *target_delta_lin_pos,
+                    target_distance,
+                    hit_probability,
+                    0 if near_ally_id == -1 else 1,
+                    *ally_delta_lin_pos,
+                    ally_distance,
+
+                ]
+            )
+
+        elif self.observation_type == 4: # past actions, relative, no hit prob
+            return np.array(
+                [
+                    *ang_vel,
+                    *ang_pos,
+                    *lin_vel,
+                    *lin_pos,
+                    *self.past_actions[agent_id],
+                    *agent_aux_state,
+                    *target_delta_lin_pos,
+                    target_distance,
+                    0 if near_ally_id == -1 else 1,
+                    *ally_delta_lin_pos,
+                    ally_distance,
+
+                ]
+            )
+
 
         else:
             raise AssertionError("Not supposed to end up here!")
@@ -522,10 +580,21 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
             self.rew_speed_magnitude[agent_id] = -self.hit_probability[agent_id][target_id]
 
-            # target_lin_pos = self.drone_positions[target_id]
-            # lin_pos = self.drone_positions[agent_id]
-            # separation_direction = (target_lin_pos - lin_pos) / (np.linalg.norm(target_lin_pos) * np.linalg.norm(lin_pos))
-            # agent_direction = self.ground_velocities[agent_id] / np.linalg.norm(self.ground_velocities[agent_id])
+        elif self.reward_type == 5:
+
+            if target_id != agent_id:  # avoid the scenario where there are no targets, returns the last rewards in the last steps
+
+                self.rew_closing_distance[agent_id] = np.clip(
+                    (self.previous_distance[agent_id][target_id] - self.current_distance[agent_id][target_id]),
+                    a_min=0,
+                    a_max=None, )
+
+                # does no consider explosion_radius in distance
+                d = self.current_distance[agent_id][target_id]
+                collision_distance = max(d, 0.05)
+                self.rew_close_to_target[agent_id] = 1 / (collision_distance + 0.005)
+
+            self.rew_speed_magnitude[agent_id] = -(1 + self.hit_probability[agent_id][target_id])
 
         self.rew_closing_distance[agent_id] *= self.distance_factor
         self.rew_close_to_target[agent_id] *= self.proximity_factor

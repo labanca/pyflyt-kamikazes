@@ -33,6 +33,7 @@ class TensorboardCallback(BaseCallback):
         self.last_ep_mean_rew = -np.inf
         self.last_100_episode_rewards = []
 
+
     def _on_training_start(self) -> None:
         """
         This method is called before the first rollout starts.

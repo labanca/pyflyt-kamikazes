@@ -34,7 +34,7 @@ class IdleState(State):
         self.drone_fsm.idle = False
 
 
-class ThreatChaseState(State):
+class ChaseThreatState(State):
 
     def enter(self):
         # print(f"Drone {self.drone_fsm.id} is entering threat chase state.")
@@ -51,7 +51,7 @@ class ThreatChaseState(State):
         elif self.drone_fsm.at_shoot_distance():
             self.drone_fsm.change_state('ShootThreatState')
 
-        elif self.drone_fsm.distance_to_threat() < 6.0:
+        elif (self.drone_fsm.distance_to_threat() > 2.0) and (self.drone_fsm.distance_to_threat() < self.drone_fsm.threat_radius * 1.5):
             self.drone_fsm.chase_threat()
 
         else:
@@ -108,7 +108,7 @@ class GoToFormationState(State):
 
 class LWManager:
 
-    def __init__(self, env: MAQuadXBaseEnv, formation_radius, threat_radius, shoot_range):
+    def __init__(self, env: MAQuadXBaseEnv, formation_radius, threat_radius, shoot_range, weapon_cooldown):
         self.env = env
         self.aviary = self.env.aviary
         self.shoot_range = shoot_range
@@ -119,6 +119,7 @@ class LWManager:
         self.squad = [LWFSM(lw_id=k,
                             threat_radius=threat_radius,
                             shoot_range=shoot_range,
+                            weapon_cooldown=weapon_cooldown,
                             manager=self) for k, v in self.env.armed_uav_types.items() if v == 'lw']
 
         #self.env.squad_id_mapping = {self.squad[i].id: i for i, v in list(enumerate(self.squad))}
@@ -163,6 +164,7 @@ class LWFSM:
                  manager: LWManager,
                  threat_radius: float,
                  shoot_range: float,
+                 weapon_cooldown: float,
                  ):
         self.last_shot_time = 0
         self.current_threat_id = None
@@ -170,16 +172,17 @@ class LWFSM:
         self.id = lw_id
         self.threat_radius = threat_radius
         self.shoot_range = shoot_range
+
         self.manager = manager
         self.states = {
             'IdleState': IdleState(self),
-            'ChaseThreatState': ThreatChaseState(self),
+            'ChaseThreatState': ChaseThreatState(self),
             'ShootThreatState': ShootThreatState(self),
             'GoToFormationState': GoToFormationState(self),
         }
         self.current_state = self.states['IdleState']
         self.gun_loaded = True
-        self.recharge_time = 2.0
+        self.recharge_time = weapon_cooldown
         self.chasing = False
         self.shooting = False
         self.reloading = False

@@ -19,7 +19,7 @@ def main():
 
     train_desc = """ take ma_quadx_chaser_20240116-142312 and train with the speed vector reward with diffent speed_factor values, trying to gain overall speed"""
 
-    params_path = 'apps/train_params.yaml'
+    params_path = 'apps/model_3000000.yaml'
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
