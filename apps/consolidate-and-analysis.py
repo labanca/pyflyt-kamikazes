@@ -1,7 +1,16 @@
 from pathlib import Path
+from pprint import pprint
 
 import pandas as pd
 import glob
+import numpy as np
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+import matplotlib
+
+from modules.utils import save_dict_to_csv
+
+matplotlib.use('TkAgg')
 
 def append_csvs(experiment_name, model_name, base_path="/app/models", eval_mode='rl'):
     """
@@ -16,7 +25,7 @@ def append_csvs(experiment_name, model_name, base_path="/app/models", eval_mode=
     DataFrame: A concatenated DataFrame containing all episodes data.
     """
     # Construct the path pattern for the CSV files
-    path_pattern = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/{eval_mode}_sc*_*x*.csv"
+    path_pattern = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/*x*.csv"
 
     # Use glob to match all csv files following the pattern
     all_files = glob.glob(path_pattern)
@@ -140,7 +149,6 @@ def calculate_metrics(input_file_path, output_file_path):
     }])
 
     ep_combat_metrics = df.groupby('scenario').apply(lambda group: pd.Series({
-        'win_rate': calc_win_rate(group),
         'mean_total_reward': calc_mean_total_reward(group),
         'mean_lw_exploded': calc_mean_lw_exploded(group),
         'mean_lm_shooted': calc_mean_lm_shooted(group),
@@ -149,12 +157,10 @@ def calculate_metrics(input_file_path, output_file_path):
         'mean_lm_exploded_per_ally': calc_mean_lm_exploded_by_ally(group),
         'mean_lm_out_of_bounds': calc_mean_lm_out_of_bounds(group),
         'mean_lm_timeovers': calc_mean_lm_timeovers(group),
-        'mean_time_to_complete': calc_mean_time_to_complete(group),
     })).reset_index()
 
     overall_combat_metrics = pd.DataFrame([{
         'scenario': f'All {eval_mode} scenarios',
-        'win_rate': calc_win_rate(df),
         'mean_total_reward': calc_mean_total_reward(df),
         'mean_lw_exploded': calc_mean_lw_exploded(df),
         'mean_lm_shooted': calc_mean_lm_shooted(df),
@@ -167,7 +173,7 @@ def calculate_metrics(input_file_path, output_file_path):
 
     #per = pd.DataFrame(overall_metrics, columns=overall_metrics.keys().values)
 
-    ep_performance_metric.to_csv(f"{output_file_path}/{eval_mode}-ep_performance_metric.csv", index=False)
+    ep_performance_metric.to_csv(f"{output_file_path}/{eval_mode}-ep_performance_metrics.csv", index=False)
     ep_combat_metrics.to_csv(f"{output_file_path}/{eval_mode}-ep_combat_metrics.csv", index=False)
 
     overall_performance_metrics.to_csv(f"{output_file_path}/{eval_mode}-overall_performance_metrics.csv", index=False)
@@ -179,10 +185,71 @@ def calculate_metrics(input_file_path, output_file_path):
     return output_file_path
 
 
+
+# --------------------------------------------------------------------------------------------
+
+def evaluate_episodes(data, metric_columns, scenario_column='scenario'):
+    """
+    Evaluate episodes by calculating descriptive statistics, confidence intervals, and plotting metrics for convergence.
+
+    Args:
+    - data (DataFrame): The dataset containing episodes and their metrics.
+    - metric_columns (list): List of columns in the data that are metrics to be analyzed.
+    - scenario_column (str): The name of the column in data that identifies the scenario of each episode.
+
+    Returns:
+    - analysis_results (dict): A dictionary containing the analysis results for each scenario.
+    """
+    analysis_results = {}
+
+    for scenario in data[scenario_column].unique():
+        scenario_data = data[data[scenario_column] == scenario]
+        scenario_analysis = {}
+
+        for metric in metric_columns:
+            metric_data = scenario_data[metric]
+
+            # Descriptive statistics
+            mean = metric_data.mean()
+            median = metric_data.median()
+            std_dev = metric_data.std()
+            min_val = metric_data.min()
+            max_val = metric_data.max()
+
+            # Confidence Intervals (95%)
+            ci_low, ci_high = stats.norm.interval(0.95, loc=mean, scale=std_dev/np.sqrt(len(metric_data)))
+
+            # Save the analysis in the dictionary
+            scenario_analysis[metric] = {
+                'mean': mean,
+                'median': median,
+                'std_dev': std_dev,
+                'min': min_val,
+                'max': max_val,
+                '95%_ci_low': ci_low,
+                '95%_ci_high': ci_high
+            }
+
+            # Convergence Analysis Plot
+            plt.figure(figsize=(10, 6))
+            plt.plot(metric_data.index, metric_data, label=metric)
+            plt.title(f'Convergence Plot for {metric} in Scenario {scenario}')
+            plt.xlabel('Episode')
+            plt.ylabel(metric)
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        analysis_results[scenario] = scenario_analysis
+
+    return analysis_results
+
+
+
 eval_mode = 'rl'
 base_path = 'apps/models'
-experiment_name = 'ma_quadx_chaser_20240202-014543'
-model_name = 'ma_quadx_chaser-30000000'
+experiment_name = 'ma_quadx_chaser_20240204-120343'
+model_name = 'ma_quadx_chaser-20027008'
 
 #append_csvs(experiment_name=experiment_name, model_name=model_name, base_path=base_path, eval_mode=eval_mode)
 
@@ -190,5 +257,22 @@ input_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/co
 metrics_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}"
 
 
-calculate_metrics(input_file_path=input_path, output_file_path=metrics_path)
+#calculate_metrics(input_file_path=input_path, output_file_path=metrics_path)
+
+# Assuming 'data' is your dataframe and it includes a column 'scenario'
+# and the metrics you're interested in are in columns like 'metric1', 'metric2', ...
+# You would call the function like this:
+metric_columns = ['exploded_target']  # replace with your actual metric column names
+
+consolidate_scenarios_path = 'apps/models/ma_quadx_chaser_20240204-120343/ep_data/ma_quadx_chaser-20027008/rl/consolidate_scenarios.csv'
+data = pd.read_csv(consolidate_scenarios_path)
+
+# Call the function with your data
+results = evaluate_episodes(data, metric_columns, 'scenario')
+
+# The results will be a dictionary where each key is a scenario, and the values are the analyses for that scenario
+pprint(results)
+confidence_interval_path = 'apps/models/ma_quadx_chaser_20240204-120343/ep_data/ma_quadx_chaser-20027008/rl/confidence_interval'
+save_dict_to_csv(results, confidence_interval_path)
+
 

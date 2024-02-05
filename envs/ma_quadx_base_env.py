@@ -1139,7 +1139,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         target_deltas = target - lin_pos
 
         # velocity v_x, v_y, v_z in the drone body frame axis
-        velocity = ( target_deltas / np.linalg.norm(target_deltas) ) * 5.0 #  max(self.current_distance[agent_id][target_id], 5.0)
+        velocity = ( target_deltas / np.linalg.norm(target_deltas) ) * 7.0 #  max(self.current_distance[agent_id][target_id], 5.0)
 
         # rotate the velocity to the target
         velocity = np.matmul( velocity, rotation.T)
