@@ -71,7 +71,7 @@ def create_boxplot_combined(base_path, experiment_name, model_name, column_name,
 
     # Read the CSV files and combine them into a single DataFrame
     for eval_mode in eval_modes:
-        file_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/consolidate_scenarios.csv"
+        file_path = f"{base_path}/{experiment_name}/ep_data/{model_name}/{eval_mode}/{eval_mode}-consolidate_scenarios.csv"
         df = pd.read_csv(file_path)
         df = df[df['scenario'].isin(scenarios)]
         df['eval_mode'] = eval_mode  # Add a column to distinguish between eval_modes
@@ -214,6 +214,10 @@ def plot_tensorboard_data(logs_dir, selected_tags=None, y_axis_range=None, run_a
     experiment_name = Path(logs_dir).parent.name
     logs_path = Path(logs_dir)
 
+    tags_mapping = {
+        'ep_mean_rew': "Episodic Mean Reward"
+    }
+
     # Iterate over each training run directory
     for run_dir in logs_path.iterdir():
         if run_dir.is_dir():
@@ -242,7 +246,7 @@ def plot_tensorboard_data(logs_dir, selected_tags=None, y_axis_range=None, run_a
                     df.drop('wall_time', axis=1, inplace=True)  # Drop wall_time column
 
                     # Plotting
-                    plt.plot(df['step'], df['value'], label=f"{run_name} - {tag}", linewidth=2)
+                    plt.plot(df['step'], df['value'], label=f"{run_name}", linewidth=2)
 
                     # Update global y-axis range
                     local_min = df['value'].min()
@@ -255,9 +259,9 @@ def plot_tensorboard_data(logs_dir, selected_tags=None, y_axis_range=None, run_a
         y_axis_range = (global_y_min, global_y_max)
 
     plt.legend(loc='best', fontsize='small')
-    plt.title(f"Episode Mean Reward per Phase")
+    plt.title(f"Training - Complete Task Model")
     plt.xlabel('Step')
-    plt.ylabel(selected_tags)
+    plt.ylabel(tags_mapping[''.join(selected_tags)])
     plt.ylim(y_axis_range)
     plt.grid(True)
     plt.tight_layout()
@@ -401,5 +405,74 @@ def plot_agent_rewards(filename, agent_id):
     plt.title(f'Rewards Over Time for Agent {agent_id}')
     plt.legend()
     plt.grid(True)
+    plt.show()
+
+
+def plot_perfomance_metric_barchart():
+
+    # Data from the table
+    scenarios = ['5x5', '10x5', '15x5', 'All']
+    metrics = ['Win Rate [\%]', 'Explosion Rate [\%]', 'Survival Rate [\%]', 'Casualty Rate [\%]', 'Timeover Rate [\%]', 'Mean Time [s]']
+    rl_data = np.array([
+        [11.6, 73.6, 91.8, 59.0],  # Win Rate
+        [61.2, 44.8, 32.4, 41.3],  # Explosion Rate
+        [0.4, 22.3, 41.3, 28.2 ],  # Survival Rate
+        [35.7, 29.2, 25.1, 28.2],  # Casualty Rate
+        [3.0, 3.9, 1.4, 2.5],  # Timeover Rate
+        [5.1, 4.0, 3.2, 3.7]  # Mean Time
+    ])
+    dc_data = np.array([
+        [2.2, 67.4, 98.6, 56.1],  # Win Rate
+        [26.4, 41.3, 31.3, 33.8],  # Explosion Rate
+        [0.2, 12.3, 39.7, 24.0],  # Survival Rate
+        [74.0, 46.3, 28.9, 42.2],  # Casualty Rate
+        [0.0, 0.5, 0.4, 0.4],  # Timeover Rate
+        [5.3, 5.1, 4.3, 4.7]  # Mean Time
+    ])
+
+
+
+    # Number of groups
+    n_groups = len(scenarios)
+
+    # Create bar width
+    bar_width = 0.25
+
+    # Set position of bar on X axis
+    r1 = np.arange(n_groups)
+    r2 = [x + bar_width for x in r1]
+
+    # Create subplots for each metric
+    fig, axs = plt.subplots(3, 2, figsize=(10, 10))  # Smaller figure size
+
+    for i, ax in enumerate(axs.flat):
+        # Make the plot with lighter colors
+        ax.bar(r1, rl_data[i],  width=bar_width,  label='RL')
+        ax.bar(r2, dc_data[i],  width=bar_width,  label='DC')
+
+        # Add xticks on the middle of the group bars
+        ax.set_xlabel('Scenarios', fontweight='bold')
+        ax.set_xticks([r + bar_width / 2 for r in range(n_groups)])
+        ax.set_xticklabels(scenarios)
+        ax.set_ylabel(metrics[i], )
+        ax.set_title(f'{metrics[i]} Comparison')
+
+        # Set the y-axis to be the same for all [0, 100]
+        if metrics[i] == 'Mean Time [s]':
+            ax.set_ylim(0, 7)
+
+        # Create legend & Show graphic
+        ax.legend(fontsize='small')
+
+    # Set the appearance settings for all plots
+    plt.rc('text', usetex=True)
+    plt.rcParams.update({'font.family': 'serif'})
+    plt.rcParams.update({'font.size': 16})
+
+    plt.tight_layout()
+    fig_filename = Path('apps/models/ma_quadx_chaser_20240204-120343', 'plots','barchat-performace-metrics.png')
+    fig_filename.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(fig_filename, format ='png', dpi=600)
+
     plt.show()
 

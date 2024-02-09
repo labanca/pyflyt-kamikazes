@@ -5,18 +5,18 @@ spawn_settings: &spawn_settings
   lm_spawn_radius: 5.0
   min_z: 1.0
   seed: &seed null
-  num_lm: &num_lm 10
-  num_lw: &num_lw 5
+  num_lm: &num_lm 1
+  num_lw: &num_lw 1
 
 
 env_kwargs:
   start_pos:
-    - - 1
-      - 1
-      - 1
+    - - 6
+      - 5
+      - 3
     - - 0
       - 0
-      - 1
+      - 2
   start_orn:
     - - 0
       - 0
@@ -27,10 +27,10 @@ env_kwargs:
   formation_center:
     - 0
     - 0
-    - 1
+    - 2
   flight_dome_size: 17.0
   seed: *seed
-  spawn_settings: *spawn_settings
+  spawn_settings: null
   num_lm: *num_lm
   num_lw: *num_lw
   agent_hz: 30
@@ -53,7 +53,8 @@ env_kwargs:
   proximity_factor: 0.1
   speed_factor: 0.1
   save_step_data: false
-  direct_control: true
+  direct_control: false
+  custom_spawn: true
 
 train_kwargs:
   device: cuda

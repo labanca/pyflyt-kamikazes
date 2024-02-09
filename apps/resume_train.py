@@ -144,17 +144,36 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240204-120343'
-    model_name = 'ma_quadx_chaser-20027008.zip'
+    model_dir = 'ma_quadx_chaser_20240208-112945'
+    model_name = 'a'
 
-    steps = 40_000_000
+    steps = 10_000_000
     num_resumes = 4
     reset_model = False
 
     for i in range(num_resumes):
 
-        if i >= 1: # lw fsm on
-            model_name = 'a'
+        # if i == 0:
+        #     env_kwargs["lw_stand_still"] = False
+        #     env_kwargs["lw_moves_random"] = False
+        #
+        # if i == 1:
+        #     env_kwargs["lw_stand_still"] = True
+        #     env_kwargs["lw_moves_random"] = False
+        #     model_name = 'a'
+        #
+        # if i == 1 or i == 2:
+        #     steps = 10_000_000
+        #     env_kwargs["lw_stand_still"] = False
+        #     env_kwargs["lw_moves_random"] = True
+        #
+        #
+        # if i == 4:    # lw fsm on
+        #     steps = 10_000_000
+        #     env_kwargs["lw_stand_still"] = False
+        #     env_kwargs["lw_moves_random"] = False
+
+
             #steps = 10_000_000
             #env_kwargs['reward_type'] = 5 # hit prob in penalty
             #env_kwargs['observation_type'] = 3 # hit prob in obs
@@ -170,12 +189,17 @@ if __name__ == "__main__":
             #env_kwargs["num_lm"] = 10
             #env_kwargs["num_lw"] = 2
 
+        print(f'{model_dir=}')
+        print(f'{model_name=}')
         pprint(f'{env_kwargs["num_lm"]=}')
         pprint(f'{env_kwargs["num_lw"]=}')
+        pprint(f'{train_kwargs["num_vec_envs"]=}')
+        pprint(f'{steps=}')
         pprint(f'{env_kwargs["spawn_settings"]["num_lm"]=}')
         pprint(f'{env_kwargs["spawn_settings"]["num_lw"]=}')
         pprint(f'{env_kwargs["lw_stand_still"]=}')
         pprint(f'{env_kwargs["lw_moves_random"]=}')
+        print(f'{env_kwargs["direct_control"]=}')
         pprint(f'{env_kwargs["lw_shoot_range"]=}')
         pprint(f'{env_kwargs["lw_threat_radius"]=}')
         pprint(f'{env_kwargs["lw_weapon_cooldown"]=}')

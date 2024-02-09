@@ -72,17 +72,18 @@ def evaluate_agent(model_path, custom_params, params_path, eval_mode):
 
 # -------------------------------------------------
 
-model_path = Path('apps/models/ma_quadx_chaser_20240204-120343/model_39500000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240202-014543/ma_quadx_chaser-30000000.zip')
 mode_dir = model_path.parent
 eval_mode = 'rl'
 
 custom_params = True
-num_games = 500
+num_games = 100
 
 params_paths = glob.glob(f"{mode_dir}\\eval_scenarios\\{eval_mode}\\*.yaml")
 print(params_paths)
 print(f"{mode_dir}\\eval_scenarios\\{eval_mode}\\*.yaml")
 
+#params_paths = params_paths[2]
 
 for scenario_param in params_paths:
 

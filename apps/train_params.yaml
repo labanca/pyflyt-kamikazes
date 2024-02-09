@@ -64,4 +64,4 @@ train_kwargs:
   nn_t:
     - 256
     - 256
-  num_vec_envs: 8
+  num_vec_envs: 12

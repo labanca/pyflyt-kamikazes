@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240204-120343/ma_quadx_chaser-20027008.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240206-152920/ma_quadx_chaser-10000000.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -39,12 +39,6 @@ while env.agents:
     #actions = {agent: env.action_space(agent).sample() for agent in env.agents}
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
 
-    # always chase
-    actions['agent_0'] = np.array([4, 4, 0, 2])  # np.array([i, i, 0, 0.123*i])env.desired_vel
-    # actions['agent_1'] = np.array([-1, 0, 0, 0.8])
-    # actions['agent_2'] = np.array([5, 2, 0, 0.8])
-    # actions['agent_3'] = np.array([0, 0, 0, 0])
-    i += 1
 
     current_speed = np.linalg.norm(env.attitudes[0][2])
     if current_speed > max_speed:
@@ -55,16 +49,6 @@ while env.agents:
 
 
     if all(terminations.values()) or all(truncations.values()):
-        print(f'********* EPISODE END **********\n')
-        print(f'{rewards=}\n')
-        print(f'{terminations=} {truncations=}\n')
-        print(f'{infos=}\n\n\n')
-        time.sleep(0)
-        env.write_step_data(Path('modules/examples/step_data.csv'))
-        env.write_obs_data(Path('modules/examples/obs_data.csv'))
-        # env.plot_rewards_data('reward_data.csv')
-        # env.plot_agent_rewards('reward_data.csv', 0)
-        # env.plot_agent_infos2('reward_data.csv', 0)
         print(env.info_counters)
         print(f'{max_speed=}')
         print(f'{max_lin_vel=}')

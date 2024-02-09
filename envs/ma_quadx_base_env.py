@@ -10,6 +10,7 @@ from PyFlyt.core import Aviary
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
 from scipy.optimize import linear_sum_assignment
+from tensorflow.python.autograph.pyct import cfg
 
 from modules.lwsfm import LWManager
 from modules.utils import *
@@ -58,7 +59,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             thrust_limit: float = 10.0,
             angular_rate_limit: float = np.pi,
             direct_control: bool = False,
-            lw_weapon_cooldown: float = 2.0
+            lw_weapon_cooldown: float = 2.0,
+            custom_spawn: bool = False,
     ):
         """__init__.
 
@@ -99,6 +101,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.thrust_limit = thrust_limit
         self.angular_rate_limit = angular_rate_limit
         self.direct_control = direct_control
+        self.custom_spawn = custom_spawn
 
         self.action_bounds = 1
 
@@ -277,9 +280,9 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.step_count = 0
 
+        self.overlay = None
 
-
-        if self.spawn_settings is not None:
+        if (self.spawn_settings is not None) or ( not self.custom_spawn):
             self.start_pos, self.start_orn, self.formation_center = generate_start_pos_orn(**self.spawn_settings)
 
         self.agents = self.possible_agents[:]
@@ -418,7 +421,7 @@ class MAQuadXBaseEnv(ParallelEnv):
                                     shoot_range=self.lw_shoot_range,
                                     )
 
-        if self.render_mode:
+        if self.render_mode and not self.custom_spawn:
             self.aviary.resetDebugVisualizerCamera(cameraDistance=1.0, cameraYaw=0, cameraPitch=0,
                                                    cameraTargetPosition=self.formation_center)
             self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
@@ -599,6 +602,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         # set the new actions and send to aviary
         self.current_actions *= 0.0
+
 
 
 
@@ -1084,11 +1088,11 @@ class MAQuadXBaseEnv(ParallelEnv):
             'lw_moves_random': self.lw_moves_random,
             'lw_threat_radius': self.lw_threat_radius,
             'lw_shoot_range': self.lw_shoot_range,
-            'lm_center_bounds': self.spawn_settings['lm_center_bounds'],
-            'lm_spawn_radius': self.spawn_settings['lm_spawn_radius'],
-            'lw_center_bounds': self.spawn_settings['lw_center_bounds'],
-            'lw_spawn_radius': self.spawn_settings['lw_spawn_radius'],
-            'min_z': self.spawn_settings['min_z'],
+#            'lm_center_bounds': self.spawn_settings['lm_center_bounds'],
+#            'lm_spawn_radius': self.spawn_settings['lm_spawn_radius'],
+#            'lw_center_bounds': self.spawn_settings['lw_center_bounds'],
+#            'lw_spawn_radius': self.spawn_settings['lw_spawn_radius'],
+#            'min_z': self.spawn_settings['min_z'],
 
         }
 

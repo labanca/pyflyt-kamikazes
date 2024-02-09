@@ -89,6 +89,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             thrust_limit: float = 1.0,
             angular_rate_limit: float = np.pi,
             direct_control:  bool = False,
+            custom_spawn: bool = False,
     ):
         """__init__.
 
@@ -136,6 +137,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             angular_rate_limit=angular_rate_limit,
             direct_control=direct_control,
             lw_weapon_cooldown=lw_weapon_cooldown,
+            custom_spawn=custom_spawn,
 
         )
 
