@@ -313,6 +313,36 @@ class LWFSM:
                     # Disarm the target drone if hit
                     self.manager.downed_lm[self.current_threat_id] += 1
 
+                    # debug_line = self.manager.aviary.addUserDebugLine(self.manager.aviary.state(self.id)[-1],
+                    #                                           self.manager.aviary.state(self.current_threat_id)[-1],
+                    #                                           lineWidth=3, replaceItemUniqueId=self.manager.env.agent_traj_line,
+                    #                                           lineColorRGB=[1, 1, 1])
+                    if self.manager.env.custom_spawn:
+                        blue_drone_pos = self.manager.aviary.state(self.id)[-1]
+                        red_drone_pos = self.manager.aviary.state(self.current_threat_id)[-1]
+
+                        # Calculate the vector from the blue drone to the red drone
+                        vector = red_drone_pos - blue_drone_pos
+
+                        # Normalize the vector
+                        norm_vector = vector / np.linalg.norm(vector)
+
+                        # Decide the offset distance
+                        offset_distance = 0.1  # for example, 0.1 meters from each drone
+
+                        # Calculate the offset vector
+                        offset_vector = norm_vector * offset_distance
+
+                        # Calculate the new starting and ending positions
+                        new_start_pos = blue_drone_pos + offset_vector
+                        new_end_pos = red_drone_pos - 2 * offset_vector
+
+                        # Draw the new vector
+                        self.manager.env.agent_traj_line = self.manager.aviary.addUserDebugLine(new_start_pos, new_end_pos,
+                                                                                                lineWidth=5,
+                                                                                                replaceItemUniqueId=self.manager.env.agent_traj_line,
+                                                                                                lineColorRGB=[1, 0.5, 0.5])
+
                     # if self.current_threat_id in self.manager.env.armed_uav_types.keys():
                     #     self.manager.env.armed_uav_types.pop(self.current_threat_id)
 

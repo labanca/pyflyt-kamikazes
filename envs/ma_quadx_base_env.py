@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
+from PIL import Image
 
 import numpy as np
 import pybullet as p
 from PyFlyt.core import Aviary
 from gymnasium import Space, spaces
 from pettingzoo import ParallelEnv
-from scipy.optimize import linear_sum_assignment
-from tensorflow.python.autograph.pyct import cfg
+from PyFlyt.core.utils.compile_helpers import check_numpy
 
 from modules.lwsfm import LWManager
 from modules.utils import *
@@ -271,6 +271,31 @@ class MAQuadXBaseEnv(ParallelEnv):
         """
         raise NotImplementedError
 
+    def get_rgb_image(self) -> np.ndarray:
+        """render."""
+        check_numpy()
+        assert (
+            self.render_mode is not None
+        ), "Please set `render_mode='human'` or `render_mode='rgb_array'` to use this function."
+        self.aviary.resetDebugVisualizerCamera(cameraDistance=self.cameraDistance, cameraYaw=self.cameraYaw,
+                                               cameraPitch=self.cameraPitch,
+                                               cameraTargetPosition=self.cameraTargetPosition)
+        # self.camera_parameters = self.aviary.getDebugVisualizerCamera(cameraDistance=4.24, cameraYaw=-198.40,
+        #                                                                 cameraPitch=-25.60,
+        #                                                                 cameraTargetPosition=[-1.39, -2.66, 2.38])
+        _, _, rgbaImg, _, _ = self.aviary.getCameraImage(
+            width=self.render_resolution[1],
+            height=self.render_resolution[0],
+            viewMatrix=self.camera_parameters[2],
+            projectionMatrix=self.camera_parameters[3],
+        )
+
+        rgbaImg = np.asarray(rgbaImg).reshape(
+            self.render_resolution[0], self.render_resolution[1], -1
+        )
+
+        return rgbaImg.astype(np.uint8)
+
     def begin_reset(self, seed=None, options=dict(), drone_options=dict()):
         """The first half of the reset function."""
         # if we already have an env, disconnect from it
@@ -281,8 +306,9 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.step_count = 0
 
         self.overlay = None
+        self.render_resolution = np.array([1080, 1920])
 
-        if (self.spawn_settings is not None) or ( not self.custom_spawn):
+        if (self.spawn_settings is not None) and ( not self.custom_spawn):
             self.start_pos, self.start_orn, self.formation_center = generate_start_pos_orn(**self.spawn_settings)
 
         self.agents = self.possible_agents[:]
@@ -378,7 +404,7 @@ class MAQuadXBaseEnv(ParallelEnv):
             start_pos=self.start_pos,
             start_orn=self.start_orn,
             drone_type="quadx",
-            render=bool(self.render_mode),
+            render= bool(self.render_mode),
             drone_options=drone_options,
             seed=seed,
         )
@@ -394,7 +420,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0], lineWidth=2)
                                for id in range(3)]
             self.change_visuals()
-            # self.init_debug_vectors()
+            self.init_debug_vectors()
+
 
     def end_reset(self, seed=None, options=dict()):
         """The tailing half of the reset function."""
@@ -421,10 +448,19 @@ class MAQuadXBaseEnv(ParallelEnv):
                                     shoot_range=self.lw_shoot_range,
                                     )
 
-        if self.render_mode and not self.custom_spawn:
-            self.aviary.resetDebugVisualizerCamera(cameraDistance=1.0, cameraYaw=0, cameraPitch=0,
-                                                   cameraTargetPosition=self.formation_center)
-            self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 1)
+        self.cameraDistance=5.12
+        self.cameraYaw=-185.20
+        self.cameraPitch=-41.20
+        self.cameraTargetPosition=[-1.39, -0.66, 1.38]
+
+
+        if self.render_mode and self.custom_spawn:
+            self.aviary.resetDebugVisualizerCamera(cameraDistance=self.cameraDistance, cameraYaw=self.cameraYaw,
+                                                   cameraPitch=self.cameraPitch,cameraTargetPosition=self.cameraTargetPosition)
+            self.aviary.configureDebugVisualizer(p.COV_ENABLE_WIREFRAME, 0)
+
+            self.camera_parameters = self.aviary.getDebugVisualizerCamera(ccameraDistance=self.cameraDistance, cameraYaw=self.cameraYaw,
+                                                   cameraPitch=self.cameraPitch,cameraTargetPosition=self.cameraTargetPosition)
 
         if self.lw_moves_random:
             for id, uav in self.armed_uavs.items():
@@ -632,6 +668,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             self.collision_matrix = self.create_collision_matrix(distance_threshold=self.explosion_radius)
             self.lw_manager.update(stand_still=self.lw_stand_still)
 
+
+
             # update reward, term, trunc, for each agent
             for ag in self.agents:
                 ag_id = self.agent_name_mapping[ag]
@@ -679,6 +717,13 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         self.step_count += 1
 
+        if self.step_count % 5 == 0 and self.custom_spawn:
+
+            if self.overlay is None:
+                self.overlay = self.get_rgb_image()[..., :3]
+            else:
+                self.overlay = np.min(np.stack([self.overlay, self.get_rgb_image()[..., :3]], axis=0), axis=0)
+
         # all targets destroyed, End.
         if self.targets == []:
             terminations = {k: True if terminations[k] == False else v for k, v in terminations.items()}
@@ -700,17 +745,30 @@ class MAQuadXBaseEnv(ParallelEnv):
             #self.summarize_infos()
             self.info_counters['mission_complete'] = 1
             self.create_dict_ep_data()
+            if self.custom_spawn:
+                self.overlay = np.min(np.stack([self.overlay, self.get_rgb_image()[..., :3]], axis=0), axis=0)
+                im = Image.fromarray(self.overlay)
+                im.save("images/quadx_trajectory.png")
 
             return observations, rewards, terminations, truncations, infos
 
         elif self.agents == []:
             #self.summarize_infos()
             self.create_dict_ep_data()
+            if self.custom_spawn:
+                self.overlay = np.min(np.stack([self.overlay, self.get_rgb_image()[..., :3]], axis=0), axis=0)
+                im = Image.fromarray(self.overlay)
+                im.save("images/quadx_trajectory.png")
+
             return observations, rewards, terminations, truncations, infos
 
         elif all(truncations.values()):
             #self.summarize_infos()
             self.create_dict_ep_data()
+            if self.custom_spawn:
+                self.overlay = np.min(np.stack([self.overlay, self.get_rgb_image()[..., :3]], axis=0), axis=0)
+                im = Image.fromarray(self.overlay)
+                im.save("images/quadx_trajectory.png")
 
         return observations, rewards, terminations, truncations, infos
 

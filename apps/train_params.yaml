@@ -55,6 +55,7 @@ env_kwargs:
   speed_factor: 0.1
   save_step_data: false
   direct_control: false
+  custom_spawn: false
 
 train_kwargs:
   device: cpu

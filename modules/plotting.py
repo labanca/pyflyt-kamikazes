@@ -215,7 +215,7 @@ def plot_tensorboard_data(logs_dir, selected_tags=None, y_axis_range=None, run_a
     logs_path = Path(logs_dir)
 
     tags_mapping = {
-        'ep_mean_rew': "Episodic Mean Reward"
+        'ep_mean_rew': "Episodic Average Return"
     }
 
     # Iterate over each training run directory
@@ -266,7 +266,7 @@ def plot_tensorboard_data(logs_dir, selected_tags=None, y_axis_range=None, run_a
     plt.grid(True)
     plt.tight_layout()
 
-    fig_filename = Path(logs_path.parent, 'plots','ep_mean_reward-phases.png')
+    fig_filename = Path(logs_path.parent, 'plots','training-ep_mean_reward-phases.png')
     fig_filename.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(fig_filename, format ='png', dpi=600)
 
@@ -411,23 +411,23 @@ def plot_agent_rewards(filename, agent_id):
 def plot_perfomance_metric_barchart():
 
     # Data from the table
-    scenarios = ['5x5', '10x5', '15x5', 'All']
+    scenarios = ['5x5', '10x5', '15x5']
     metrics = ['Win Rate [\%]', 'Explosion Rate [\%]', 'Survival Rate [\%]', 'Casualty Rate [\%]', 'Timeover Rate [\%]', 'Mean Time [s]']
     rl_data = np.array([
-        [11.6, 73.6, 91.8, 59.0],  # Win Rate
-        [61.2, 44.8, 32.4, 41.3],  # Explosion Rate
-        [0.4, 22.3, 41.3, 28.2 ],  # Survival Rate
-        [35.7, 29.2, 25.1, 28.2],  # Casualty Rate
-        [3.0, 3.9, 1.4, 2.5],  # Timeover Rate
-        [5.1, 4.0, 3.2, 3.7]  # Mean Time
+        [11.6, 73.6, 91.8,],  # Win Rate
+        [61.2, 44.8, 32.4,],  # Explosion Rate
+        [0.4, 22.3, 41.3,  ],  # Survival Rate
+        [35.7, 29.2, 25.1, ],  # Casualty Rate
+        [3.0, 3.9, 1.4, ],  # Timeover Rate
+        [5.1, 4.0, 3.2, ]  # Mean Time
     ])
     dc_data = np.array([
-        [2.2, 67.4, 98.6, 56.1],  # Win Rate
-        [26.4, 41.3, 31.3, 33.8],  # Explosion Rate
-        [0.2, 12.3, 39.7, 24.0],  # Survival Rate
-        [74.0, 46.3, 28.9, 42.2],  # Casualty Rate
-        [0.0, 0.5, 0.4, 0.4],  # Timeover Rate
-        [5.3, 5.1, 4.3, 4.7]  # Mean Time
+        [2.2, 67.4, 98.6, ],  # Win Rate
+        [26.4, 41.3, 31.3, ],  # Explosion Rate
+        [0.2, 12.3, 39.7, ],  # Survival Rate
+        [74.0, 46.3, 28.9, ],  # Casualty Rate
+        [0.0, 0.5, 0.4, ],  # Timeover Rate
+        [5.3, 5.1, 4.3, ]  # Mean Time
     ])
 
 

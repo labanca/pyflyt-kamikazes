@@ -16,7 +16,7 @@ run_aliases = {
     'ma_quadx_chaser-40081024': 'Run 4'
 }
 selected_tags = ['ep_mean_rew']
-#plot_tensorboard_data(logs_dir,selected_tags=selected_tags, run_aliases=run_aliases, y_axis_range=None)
+plot_tensorboard_data(logs_dir,selected_tags=selected_tags, run_aliases=run_aliases, y_axis_range=None)
 
 
 # compare TB tags from different experiments

@@ -80,9 +80,11 @@ def train_butterfly_supersuit(
         new_model_name = model_name
 
     else:
-        print(f"\nModel {model_path} found. Resuming training.\n")
+
 
         model = PPO.load(model_path, env=env, device=device)
+
+        print(f"\nModel {model_path} found. Resuming training at num_timesteps {model.num_timesteps} .\n")
 
         new_total_timesteps = (steps + model.num_timesteps)
         new_model_name = f"{env.unwrapped.metadata.get('name')}-{new_total_timesteps}"
@@ -144,7 +146,7 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'ma_quadx_chaser_20240208-112945'
+    model_dir = 'a'
     model_name = 'a'
 
     steps = 10_000_000
@@ -153,8 +155,10 @@ if __name__ == "__main__":
 
     for i in range(num_resumes):
 
-        # if i == 0:
-        #     env_kwargs["lw_stand_still"] = False
+
+
+        if i > 0:
+            steps = 10_000_000
         #     env_kwargs["lw_moves_random"] = False
         #
         # if i == 1:

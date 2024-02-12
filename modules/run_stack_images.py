@@ -23,7 +23,7 @@ num_games = 1
 
 print(env_kwargs)
 
-start_pos = np.array([[-7, -5.5, 5],  [0, 0, 4]]) #[5, 4, 2.5],
+start_pos = np.array([[-5.0, -3.0, 6],  [0, 1, 2]]) #[5, 4, 2.5],
 start_orn = np.zeros_like(start_pos)
 spawn_settings['start_pos'] = start_pos
 spawn_settings['start_orn'] = start_orn
@@ -33,21 +33,15 @@ env_kwargs['start_orn'] = start_orn
 env = MAQuadXChaserEnv(render_mode='human', **env_kwargs)
 observations, infos = env.reset(seed=spawn_settings['seed'])
 
-env.aviary.resetDebugVisualizerCamera(cameraDistance=4.24, cameraYaw=-198.40, cameraPitch=-25.60, cameraTargetPosition=[-1.39,-2.66,2.38])
-env.aviary.configureDebugVisualizer(env.aviary.COV_ENABLE_WIREFRAME, 0)
+#env.aviary.resetDebugVisualizerCamera(cameraDistance=4.24, cameraYaw=-198.40, cameraPitch=-25.60, cameraTargetPosition=[-1.39,-2.66,2.38])
+#env.aviary.configureDebugVisualizer(env.aviary.COV_ENABLE_WIREFRAME, 0)
 
 
 while env.agents:
     print(env.aviary.elapsed_time)
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
     observations, rewards, terminations, truncations, infos = env.step(actions)
-
-    if env.step_count % 5 == 0:
-
-        if env.overlay is None:
-            env.overlay = env.render()[..., :3]
-        else:
-            env.overlay = np.min(np.stack([env.overlay, env.render()[..., :3]], axis=0), axis=0)
+#    env.render()
 
     if all(terminations.values()) or all(truncations.values()):
         if env.save_step_data:

@@ -162,7 +162,7 @@ def generate_mean_std_latex_table(rl_df, dc_df, scenarios, metrics_to_use):
         'ally_collision': 'Ally collisions',
         'exploded_by_ally': 'Exploded by ally',
         'out_of_bounds': 'Out of bounds',
-        'timeover': 'timeovers',
+        'timeover': 'Timeovers',
     }
 
     # Start the LaTeX table
@@ -259,8 +259,8 @@ with open(combat_metrics_latex_file_path, 'w') as file:
 print(f'Combat metrics latex table saved at: {combat_metrics_latex_file_path}')
 
 
-rl_scenario_consolidated_path = f'{input_path}/dc/dc-consolidate_scenarios.csv'
-dc_scenario_consolidated_path = f'{input_path}/rl/rl-consolidate_scenarios.csv'
+rl_scenario_consolidated_path = f'{input_path}/rl/rl-consolidate_scenarios.csv'
+dc_scenario_consolidated_path = f'{input_path}/dc/dc-consolidate_scenarios.csv'
 scenario_order = ['5x5', '10x5', '15x5', 'All Scenarios']
 metrics_to_use = ['agents_mean_acc_rewards', 'exploded_target','downed','survived','crashes',
                   'ally_collision','exploded_by_ally','out_of_bounds','timeover']

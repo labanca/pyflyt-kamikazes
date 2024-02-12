@@ -35,7 +35,7 @@ env_kwargs:
   num_lw: *num_lw
   agent_hz: 30
   max_duration_seconds: 10
-  lw_stand_still: false
+  lw_stand_still: true
   lw_moves_random: false
   lw_chases: false
   lw_attacks: false
@@ -55,6 +55,7 @@ env_kwargs:
   save_step_data: false
   direct_control: false
   custom_spawn: true
+
 
 train_kwargs:
   device: cuda
