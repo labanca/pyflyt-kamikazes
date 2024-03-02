@@ -146,19 +146,15 @@ if __name__ == "__main__":
     spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
     root_dir = 'apps/models'
-    model_dir = 'a'
-    model_name = 'a'
+    model_dir = 'ma_quadx_chaser_20240213-082419'
+    model_name = 'ma_quadx_chaser-70162048.zip'
 
     steps = 10_000_000
-    num_resumes = 4
+    num_resumes = 3
     reset_model = False
 
     for i in range(num_resumes):
 
-
-
-        if i > 0:
-            steps = 10_000_000
         #     env_kwargs["lw_moves_random"] = False
         #
         # if i == 1:

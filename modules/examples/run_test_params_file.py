@@ -9,7 +9,7 @@ from modules.utils import read_yaml_file
 
 seed = None
 
-model_path = Path('apps/models/ma_quadx_chaser_20240206-152920/ma_quadx_chaser-10000000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240208-112945/ma_quadx_chaser-40056448.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 model = PPO.load(model_path)
@@ -52,6 +52,9 @@ while env.agents:
         print(env.info_counters)
         print(f'{max_speed=}')
         print(f'{max_lin_vel=}')
+        if env.save_step_data:
+            env.write_step_data(Path('modules/examples/step_data.csv'))
+            env.write_obs_data(Path('modules/examples/obs_data.csv'))
         observations, infos = env.reset(seed=seed)
         num_games -= 1
         print(f'Remaining games: {num_games}')

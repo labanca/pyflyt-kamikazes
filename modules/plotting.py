@@ -476,3 +476,54 @@ def plot_perfomance_metric_barchart():
 
     plt.show()
 
+
+
+def load_progress_data(logs_dir, experiment_alias):
+    """
+    Recursively search for progress.csv files in the experiment's log directory, concatenate them,
+    and return as a pandas DataFrame.
+    """
+    all_data = []
+    logs_path = Path(logs_dir)
+
+    # Search for all progress.csv files within subdirectories of the logs directory
+    for progress_file in logs_path.rglob('progress.csv'):
+        df = pd.read_csv(progress_file)
+        df['Experiment'] = experiment_alias  # Add a column for the experiment alias
+        all_data.append(df)
+
+    # Concatenate all found data
+    if all_data:
+        return pd.concat(all_data, ignore_index=True)
+    else:
+        print(f"No progress.csv files found in {logs_dir}")
+        return pd.DataFrame()  # Return an empty DataFrame if no files found
+
+
+def plot_progress_data(data, tag='ep_mean_rew'):
+    """
+    Plot the specified tag from the combined progress.csv data of multiple experiments.
+    """
+    # Set the appearance settings for all plots
+    plt.rc('text', usetex=True)
+    plt.rcParams.update({'font.family': 'serif'})
+    plt.rcParams.update({'font.size': 16})
+
+
+
+    plt.figure(figsize=(12, 6))
+    sns.lineplot(data=data, x="time/total_timesteps", y=tag, hue="Experiment",  errorbar=('ci', 95), err_style="band")
+    plt.title('Comparison of Average Episodic Return Across Executions')
+    plt.xlabel('Step')
+    plt.ylabel('Average Episodic Return')
+    plt.grid(True)
+    plt.legend(loc='best',) #fontsize='small'
+    plt.tight_layout()
+
+    fig_filename = Path('apps/models/ma_quadx_chaser_20240204-120343', 'plots','multiple-trains.png')
+    fig_filename.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(fig_filename, format ='png', dpi=600)
+
+    plt.show()
+
+

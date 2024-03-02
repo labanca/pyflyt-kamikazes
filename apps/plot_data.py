@@ -1,22 +1,56 @@
+import pandas as pd
+
 from modules.plotting import plot_tensorboard_data, plot_same_tag_across_experiments, plot_tag_across_runs, \
-    create_boxplot, create_cdf_plot, create_histogram, create_boxplot_combined, plot_perfomance_metric_barchart
+    create_boxplot, create_cdf_plot, create_histogram, create_boxplot_combined, plot_perfomance_metric_barchart, \
+    load_progress_data, plot_progress_data
 
 base_path = "apps/models"
-experiment_name = "ma_quadx_chaser_20240204-120343"
-model_name = 'model_39500000'
+
+# Load data from multiple experiments
+experiment_data = []
+
+
+experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240204-120343/logs', 'model 1'))
+#experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240205-180813/logs', 'train 2'))
+experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240210-023412/logs', 'model 2'))
+experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240210-232343/logs', 'model 3'))
+experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240212-021804/logs', 'model 4'))
+experiment_data.append(load_progress_data('apps/models/ma_quadx_chaser_20240210-023412/logs', 'model 5'))
+
+
+
+# Combine all experiments data into a single DataFrame
+all_experiment_data = pd.concat(experiment_data, ignore_index=True)
+
+
+# Plot the aggregated data
+plot_progress_data(all_experiment_data)
+
+
+
+
+
+
+
+
+
+
+
+experiment_name = "ma_quadx_chaser_20240213-082419"
+model_name = 'ma_quadx_chaser-60135040.zip'
 
 experiment_path = f"{base_path}/{experiment_name}"
 
 # Do a plot for selected TB tags for each run of one experiment
 logs_dir = f'{experiment_path}/logs'
 run_aliases = {
-    'ma_quadx_chaser-10000000': 'Run 1',
-    'ma_quadx_chaser-20027008': 'Run 2',
-    'ma_quadx_chaser-30054016': 'Run 3',
-    'ma_quadx_chaser-40081024': 'Run 4'
+    'ma_quadx_chaser-10000000': 'Phase 1',
+    'ma_quadx_chaser-20027008': 'Phase 2',
+    'ma_quadx_chaser-30054016': 'Phase 2',
+    'ma_quadx_chaser-40081024': 'Phase 3'
 }
 selected_tags = ['ep_mean_rew']
-plot_tensorboard_data(logs_dir,selected_tags=selected_tags, run_aliases=run_aliases, y_axis_range=None)
+#plot_tensorboard_data(logs_dir,selected_tags=selected_tags, run_aliases=run_aliases, y_axis_range=None)
 
 
 # compare TB tags from different experiments
@@ -61,4 +95,4 @@ scenarios = ['5x5','5x5', '10x5', '10x5', '15x5 ', '15x5 ']
 
 #create_histogram(column_name=column_name, scenarios=scenarios, base_path=base_path, experiment_name=experiment_name, model_name=model_name, eval_mode=eval_mode)
 
-plot_perfomance_metric_barchart()
+#plot_perfomance_metric_barchart()

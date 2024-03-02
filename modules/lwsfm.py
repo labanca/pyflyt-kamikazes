@@ -338,9 +338,9 @@ class LWFSM:
                         new_end_pos = red_drone_pos - 2 * offset_vector
 
                         # Draw the new vector
-                        self.manager.env.agent_traj_line = self.manager.aviary.addUserDebugLine(new_start_pos, new_end_pos,
+                        self.manager.env.debuglines[self.id - self.manager.env.num_lm] = self.manager.aviary.addUserDebugLine(new_start_pos, new_end_pos,
                                                                                                 lineWidth=5,
-                                                                                                replaceItemUniqueId=self.manager.env.agent_traj_line,
+                                                                                                replaceItemUniqueId=self.manager.env.debuglines[self.id - self.manager.env.num_lm],
                                                                                                 lineColorRGB=[1, 0.5, 0.5])
 
                     # if self.current_threat_id in self.manager.env.armed_uav_types.keys():

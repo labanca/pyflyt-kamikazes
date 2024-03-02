@@ -3,30 +3,34 @@ from stable_baselines3 import PPO
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.utils import *
 
-model_path = Path('apps/models/ma_quadx_chaser_20240204-120343/model_39500000.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240208-112945/ma_quadx_chaser-40056448.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 
-if 'saved_models' in model_folder.parts:
-    model_folder = model_folder.parent
-elif 'logs' in model_folder.parts:
-    model_folder = model_folder.parent.parent
-
 model = PPO.load(model_path)
 
-params_path = f'modules/examples/train_params_test.yaml'
+params_path = f'modules/video_params.yaml'
 spawn_settings, env_kwargs, train_kwargs = read_yaml_file(params_path)
 
+lw_formation_center = [0, 0, 2]
 
 
-num_games = 1
+lm_1x5 = np.array([[12, 0, 2]])
+lm_5x5 = np.array([[8, 0, 6], [7,-6,4], [7.5, 10, 3], [10, -2, 1.5], [12, 9, 3], [-10, 5, 5] ])
 
-print(env_kwargs)
 
-start_pos = np.array([[-5.0, -3.0, 6],  [0, 1, 2]]) #[5, 4, 2.5],
+lm_swarm = lm_5x5
+lw_squad = generate_formation_pos(formation_center=lw_formation_center, num_drones=5, radius=1.0, min_z=1)
+
+start_pos = np.concatenate([lm_swarm, lw_squad], axis=0)
 start_orn = np.zeros_like(start_pos)
 spawn_settings['start_pos'] = start_pos
 spawn_settings['start_orn'] = start_orn
+spawn_settings['num_lm'] = lm_swarm.shape[0]
+spawn_settings['num_lw'] = lw_squad.shape[0]
+env_kwargs['num_lm'] = lm_swarm.shape[0]
+env_kwargs['num_lw'] = lw_squad.shape[0]
+env_kwargs['formation_center'] = lw_formation_center
 env_kwargs['start_pos'] = start_pos
 env_kwargs['start_orn'] = start_orn
 
@@ -38,21 +42,11 @@ observations, infos = env.reset(seed=spawn_settings['seed'])
 
 
 while env.agents:
-    print(env.aviary.elapsed_time)
+
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
     observations, rewards, terminations, truncations, infos = env.step(actions)
-#    env.render()
 
-    if all(terminations.values()) or all(truncations.values()):
-        if env.save_step_data:
-            env.write_step_data(Path(model_folder, 'run-data', f'{model_name}.csv'))
-            env.write_obs_data(Path(model_folder, 'run-data', f'obs-{model_name}.csv'))
-
-        num_games -= 1
-        print(f'Remaining games: {num_games}')
-
-    if num_games == 0:
-        print(env.info_counters)
-        break
-
+    # if all(terminations.values() or all(truncations.values())):
+    #     break
+print(env.info_counters)
 env.close()

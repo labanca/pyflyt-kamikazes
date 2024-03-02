@@ -248,8 +248,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
 
         # relative ground relative velocities and ground relative magnitude
         self.relative_lin_velocities = self.ground_velocities[:][:, np.newaxis, :] - self.ground_velocities[:]
-        self.current_vel_magnitude = np.linalg.norm(self.ground_velocities, axis=-1)
+        self.current_vel_magnitude = np.linalg.norm(np.array(ground_velocities), axis=-1)
         self.current_rel_vel_magnitude = np.linalg.norm(self.relative_lin_velocities, axis=-1)
+        self.current_lin_vel_magnitude = np.linalg.norm(self.linear_velocities, axis=-1)
 
         # angles between the ground velocity and separation
         # for id in range(self.ground_velocities.shape[0]):
@@ -343,10 +344,9 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
         else:
             hit_probability = 0.001
 
-        if self.max_achieved_speed < self.current_vel_magnitude[agent_id]:
-            self.max_achieved_speed = self.current_vel_magnitude[agent_id]
-
-        if self.max_achieved_rel_speed < self.current_rel_vel_magnitude[agent_id][target_id]:
+        agent = self.drone_id_mapping[agent_id]
+        if (self.max_achieved_rel_speed < self.current_rel_vel_magnitude[agent_id][target_id]) and (
+                not self.current_term[agent] or not self.current_trun[agent]):
             self.max_achieved_rel_speed = self.current_rel_vel_magnitude[agent_id][target_id]
 
         if self.save_step_data:
@@ -681,7 +681,7 @@ class MAQuadXChaserEnv(MAQuadXBaseEnv):
             fieldnames = ["aviary_steps", "physics_steps", "step_count", "agent_id", "elapsed_time",
                           "rew_closing_distance", "rew_close_to_target", "rew_engaging_enemy", "rew_speed_magnitude",
                           "rew_near_engagement", "acc_rewards",
-                          "vel_angles", "rel_vel_magnitudade", "approaching", "chasing", "in_range", "in_cone",
+                          "vel_angles", "rel_vel_magnitude", "current_lin_vel_magnitude", "approaching", "chasing", "in_range", "in_cone",
                           "current_term",
                           "info[downed]", "info[exploded_target]", "info[exploded_ally]", "info[crashes]",
                           "info[ally_collision]", "info[is_success]",

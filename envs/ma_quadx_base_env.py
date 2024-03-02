@@ -363,6 +363,8 @@ class MAQuadXBaseEnv(ParallelEnv):
         self.previous_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.current_rel_vel_magnitude = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
 
+        self.current_lin_vel_magnitude = np.zeros(self.num_drones, dtype=np.float64)
+
         self.forward_vecs = np.zeros((self.num_drones, self.num_drones), dtype=np.float64)
         self.separation = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
         self.ground_velocities = np.zeros((self.num_drones, self.num_drones, 3), dtype=np.float64)
@@ -407,6 +409,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             render= bool(self.render_mode),
             drone_options=drone_options,
             seed=seed,
+            world_scale=1,
+
         )
 
         if self.lw_stand_still:
@@ -418,7 +422,7 @@ class MAQuadXBaseEnv(ParallelEnv):
 
         if self.render_mode:
             self.debuglines = [self.aviary.addUserDebugLine([0, 0, 0], [0, 0, 1], lineColorRGB=[1, 0, 0], lineWidth=2)
-                               for id in range(3)]
+                               for id in range(self.num_lw)]
             self.change_visuals()
             self.init_debug_vectors()
 
@@ -448,10 +452,11 @@ class MAQuadXBaseEnv(ParallelEnv):
                                     shoot_range=self.lw_shoot_range,
                                     )
 
-        self.cameraDistance=5.12
-        self.cameraYaw=-185.20
-        self.cameraPitch=-41.20
-        self.cameraTargetPosition=[-1.39, -0.66, 1.38]
+        self.cameraDistance=2.84
+        self.cameraPitch=-8.8
+        self.cameraYaw = -25.60
+        #self.cameraTargetPosition=[self.formation_center[0]+5,self.formation_center[1]+2,self.formation_center[2]]
+        self.cameraTargetPosition = [2,0,3]
 
 
         if self.render_mode and self.custom_spawn:
@@ -639,9 +644,6 @@ class MAQuadXBaseEnv(ParallelEnv):
         # set the new actions and send to aviary
         self.current_actions *= 0.0
 
-
-
-
         for id, uav in self.armed_uavs.items():
             if self.get_drone_type_by_id(id) == 'lm':
                 if not self.direct_control:
@@ -698,6 +700,13 @@ class MAQuadXBaseEnv(ParallelEnv):
                 if self.save_step_data:
                     self.append_step_data(ag)
                     self.append_obs_data(self.observation_dict)
+
+                agent_id = self.agent_name_mapping[ag]
+                if (self.max_achieved_speed < self.current_vel_magnitude[agent_id]) and (
+                        not self.current_term[ag] or not self.current_trun[ag]):
+                    self.max_achieved_speed = self.current_vel_magnitude[agent_id]
+
+
 
             for agent in self.agents:
                 self.compute_collisions(agent)
@@ -1077,7 +1086,8 @@ class MAQuadXBaseEnv(ParallelEnv):
             "rew_near_engagement": self.rew_near_engagement[agent_id],
             "acc_rewards": self.current_acc_rew[agent],
             "vel_angles": self.current_vel_angles[agent_id][target_id],
-            "rel_vel_magnitudade": self.current_rel_vel_magnitude[agent_id][target_id],
+            "rel_vel_magnitude": self.current_rel_vel_magnitude[agent_id][target_id],
+            "current_lin_vel_magnitude": self.current_lin_vel_magnitude[agent_id],
             "approaching": int(self.approaching[agent_id][target_id]),
             "chasing": int(self.chasing[agent_id][target_id]),
             "in_range": int(self.in_range[agent_id][target_id]),
@@ -1201,7 +1211,7 @@ class MAQuadXBaseEnv(ParallelEnv):
         target_deltas = target - lin_pos
 
         # velocity v_x, v_y, v_z in the drone body frame axis
-        velocity = ( target_deltas / np.linalg.norm(target_deltas) ) * 7.0 #  max(self.current_distance[agent_id][target_id], 5.0)
+        velocity = (target_deltas / np.linalg.norm(target_deltas)) * 7.0 #  max(self.current_distance[agent_id][target_id], 5.0)
 
         # rotate the velocity to the target
         velocity = np.matmul( velocity, rotation.T)

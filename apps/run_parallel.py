@@ -1,9 +1,10 @@
+import time
 from pathlib import Path
 from stable_baselines3 import PPO
 from envs.ma_quadx_chaser_env import MAQuadXChaserEnv
 from modules.utils import *
 
-model_path = Path('apps/models/ma_quadx_chaser_20240208-112945/ma_quadx_chaser-40056448.zip')
+model_path = Path('apps/models/ma_quadx_chaser_20240213-082419/ma_quadx_chaser-60135040.zip')
 model_name = model_path.stem
 model_folder = model_path.parent
 
@@ -26,6 +27,7 @@ print(env_kwargs)
 
 while env.agents:
     print(env.aviary.elapsed_time)
+
     actions = {agent: model.predict(observations[agent], deterministic=True)[0] for agent in env.agents}
     observations, rewards, terminations, truncations, infos = env.step(actions)
 

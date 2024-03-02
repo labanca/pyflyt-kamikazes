@@ -96,6 +96,9 @@ def calculate_metrics(input_file_path, output_file_path):
             calc_timeover_rate(group)
         )
     def calc_mean_total_reward(group):
+        return group['max_achieved_speed'].mean()
+
+    def calc_mean_speed_magintude(group):
         return group['agents_total_acc_rewards'].mean()
 
     def calc_mean_lm_shooted(group):
@@ -161,6 +164,7 @@ def calculate_metrics(input_file_path, output_file_path):
         'mean_lm_exploded_per_ally': calc_mean_lm_exploded_by_ally(group),
         'mean_lm_out_of_bounds': calc_mean_lm_out_of_bounds(group),
         'mean_lm_timeovers': calc_mean_lm_timeovers(group),
+        'mean_lm_maxspeed': calc_mean_lm_timeovers(group),
     })).reset_index()
 
     overall_combat_metrics = pd.DataFrame([{
@@ -173,7 +177,8 @@ def calculate_metrics(input_file_path, output_file_path):
         'mean_lm_ally_collisions': calc_mean_lm_ally_collisions(df),
         'mean_lm_exploded_per_ally': calc_mean_lm_exploded_by_ally(df),
         'mean_lm_out_of_bounds': calc_mean_lm_out_of_bounds(df),
-        'mean_lm_timeovers': calc_mean_lm_timeovers(df)
+        'mean_lm_timeovers': calc_mean_lm_timeovers(df),
+        'mean_lm_maxspeed': calc_mean_lm_timeovers(df),
     }])
 
     #per = pd.DataFrame(overall_metrics, columns=overall_metrics.keys().values)
@@ -279,7 +284,7 @@ calculate_metrics(input_file_path=input_path, output_file_path=metrics_path)
 # Assuming 'data' is your dataframe and it includes a column 'scenario'
 # and the metrics you're interested in are in columns like 'metric1', 'metric2', ...
 # You would call the function like this:
-metric_columns = ['exploded_target', 'downed', 'survived', 'crashes', 'ally_collision', 'exploded_by_ally', 'out_of_bounds', 'timeover' ]  # replace with your actual metric column names
+metric_columns = ['exploded_target', 'downed', 'survived', 'crashes', 'ally_collision', 'exploded_by_ally', 'out_of_bounds', 'timeover', 'max_achieved_speed' ]  # replace with your actual metric column names
 
 data = pd.read_csv(input_path)
 

@@ -1,51 +1,51 @@
-"""Spawn a single drone, then command it to go to two setpoints consecutively, and plots the xyz output."""
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-
 from PyFlyt.core import Aviary
+import matplotlib
+
 matplotlib.use('TkAgg')
 
+def try_velocity(target_velocity: float, log) -> bool:
+    """Returns True if the target_velocity is achievable"""
+    num_steps = 5000
 
+    # spawn the UAV
+    start_pos = np.array([[0.0, 0.0, 2.0]])
+    start_orn = np.array([[0.0, 0.0, 0.0]])
+    env = Aviary(start_pos=start_pos, start_orn=start_orn, drone_type="quadx")
 
-# the starting position and orientations
-start_pos = np.array([[0.0, 0.0, 1.0]])
-start_orn = np.array([[0.0, 0.0, 0.0]])
+    # set to [u, v, vr, z]
+    env.set_mode(4)
 
-drone_options = {}
-drone_options['drone_model'] = 'custom_cf2x'
-# environment setup
-env = Aviary(start_pos=start_pos, start_orn=start_orn, render=True, drone_type="quadx", drone_options=drone_options)
+    # set the UAV to fly at constant x m/s, maintain 2 m altitude
+    env.set_setpoint(0, np.array([target_velocity, 0.0, 0.0, 2.0]))
 
-# set to position control
-env.set_mode(7)
-max_speed = 0
+    # run the simulation and log the results
+    for i in range(num_steps):
+        env.step()
 
+        # record the linear position state
+        log[i] = env.state(0)[-1]
 
+        # if we go below the ground, we failed to maintain the target velocity
+        if env.state(0)[3, -1] <= 0.0:
+            plt.plot(np.arange(i), log[:i+1])
+            plt.show()
 
-steps = 1000
-# initialize the log
-log = np.zeros((steps, 3), dtype=np.float32)
+            return False
 
-setpoint = np.array([15.0, 15.0, 0.0, 2.0])
-env.set_setpoint(0, setpoint)
+    # if we reach this point, the drone successfully reached the target velocity without hitting the floor
+    return True
 
-for i in range(steps):
-    env.step()
+if __name__ == "__main__":
+    log = np.zeros((5000, 3), dtype=np.float32)
 
-    # record the linear position state
-    log[i] = env.state(0)[-1]
-    current_speed = np.linalg.norm(env.state(0)[2])
-    if current_speed > max_speed:
-        max_speed = current_speed
-        max_lin_vel = env.state(0)[2]
+    for i in range(7, 20):
+        if try_velocity(float(i), log):
+            print(f"Successfully reached {i} m/s.")
+        else:
+            print(f"Failed to reach {i} m/s.")
+            break
 
-# for the next 500 steps, go to x=0, y=0, z=2, rotate 45 degrees
-# plot stuff out
-print(f'{max_speed=}')
-print(f'{max_lin_vel=}')
-plt.plot(np.arange(steps), log[:, 0], label='x')  # log[:, 0] assumes that x is in the first column
-plt.plot(np.arange(steps), log[:, 1], label='y')  # log[:, 1] assumes that y is in the second column
-plt.plot(np.arange(steps), log[:, 2], label='z')
-plt.legend()
-plt.show()
+    plt.plot(np.arange(1000), log)
+    plt.show()
